@@ -16,7 +16,7 @@ Update if you changed any of:
 - `GfxOptions` / `ShaderConfig` / themes / defaults
 - Sessions, settings persistence, API runs, DB schema
 - New modules or moved file responsibilities
-- Renderer backend (Canvas 2D / Pixi)
+- Renderer / Pixi filters / GfxOptions
 
 Skip for pure typo/CSS polish, unrelated refactors, or docs-only edits.
 

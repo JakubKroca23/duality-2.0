@@ -1,7 +1,7 @@
 import { Filter, GlProgram, UniformGroup, defaultFilterVert } from 'pixi.js';
 import type { TextureSource } from 'pixi.js';
 
-export const MAX_LIGHTS = 12;
+export const MAX_LIGHTS = 48;
 
 const fragment = /* glsl */ `
 in vec2 vTextureCoord;
@@ -10,11 +10,11 @@ out vec4 finalColor;
 uniform sampler2D uTexture;
 uniform sampler2D uSideTexture;
 
-uniform vec2 uLightPos[12];
-uniform vec3 uLightColor[12];
-uniform float uLightIntensity[12];
-uniform float uLightRadius[12];
-uniform float uLightSide[12];
+uniform vec2 uLightPos[48];
+uniform vec3 uLightColor[48];
+uniform float uLightIntensity[48];
+uniform float uLightRadius[48];
+uniform float uLightSide[48];
 uniform int uLightCount;
 uniform float uBoardSize;
 uniform float uFramePad;
@@ -33,7 +33,7 @@ void main() {
   float side = texture(uSideTexture, playUv).r;
   vec3 accum = vec3(0.0);
 
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < 48; i++) {
     if (i >= uLightCount) break;
     if (abs(side - uLightSide[i]) > 0.5) continue;
 

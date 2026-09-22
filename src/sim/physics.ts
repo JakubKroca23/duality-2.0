@@ -76,21 +76,21 @@ export function updateParticles(state: SimState): void {
 }
 
 export function resizeCanvas(state: SimState): void {
-  const { canvas, ctx } = state;
+  const { canvas } = state;
   const container = canvas.parentElement;
   if (!container) return;
   const size = Math.floor(container.clientWidth);
   if (size <= 0) return;
 
   const oldWidth = state.boardWidth;
-  const dpr = window.devicePixelRatio || 1;
   const framePad = Math.max(12, Math.min(28, Math.round(size * 0.03)));
   const board = Math.max(32, size - framePad * 2);
 
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  ctx.resetTransform();
-  ctx.scale(dpr, dpr);
+  // Keep the layout probe canvas in CSS size only — Pixi owns the WebGL buffer.
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.width = 1;
+  canvas.height = 1;
 
   state.framePad = framePad;
   state.boardWidth = board;

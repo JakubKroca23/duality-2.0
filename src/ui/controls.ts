@@ -24,8 +24,6 @@ import { loadSettings, saveSettings } from '../sim/persistence';
 import { applyBallRadii, resetSimulation, resizeCanvas } from '../sim/physics';
 import { markGridDirty, updateScoreboard } from '../sim/render';
 import { invalidatePageBleed } from '../sim/ambient';
-import { destroyAllPixi } from '../sim/pixi/sessionPixi';
-import { getRendererMode, setRendererMode } from '../sim/rendererMode';
 import {
   addUserScheme,
   getUserSchemes,
@@ -42,7 +40,6 @@ import {
   getActiveSession,
   getActiveSessionOrNull,
   getActiveState,
-  getSessions,
   openNewArena,
   resizeAllSessions,
 } from './sessions';
@@ -438,14 +435,14 @@ export function bindControls(_initial?: SimState): void {
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      if (action === 'expand-run') expandSession(id);
+      if (action === 'expand-run') void expandSession(id);
       else void closeSession(id);
       return;
     }
 
     if (action === 'new-arena') {
       e.stopPropagation();
-      openNewArena();
+      void openNewArena();
       return;
     }
 
@@ -601,17 +598,6 @@ export function bindControls(_initial?: SimState): void {
     state.gfxOptions.scanlines = (e.target as HTMLInputElement).checked;
     syncScanlinesOverlay();
     saveSettings(state);
-  });
-
-  const chkPixiRenderer = el<HTMLInputElement>('chkPixiRenderer');
-  chkPixiRenderer.checked = getRendererMode() === 'pixi';
-  chkPixiRenderer.addEventListener('change', (e) => {
-    const on = (e.target as HTMLInputElement).checked;
-    // Always tear down so a previous failed init can retry.
-    destroyAllPixi();
-    setRendererMode(on ? 'pixi' : 'canvas2d');
-    for (const session of getSessions()) markGridDirty(session.state);
-    invalidatePageBleed();
   });
 
   const sliderGrid = el<HTMLInputElement>('sliderGrid');
@@ -890,8 +876,6 @@ export function bindControls(_initial?: SimState): void {
 
     chkScanlines.checked = state.gfxOptions.scanlines;
     syncScanlinesOverlay();
-
-    chkPixiRenderer.checked = getRendererMode() === 'pixi';
 
     sliderGrid.value = String(Math.round(state.gfxOptions.gridOpacity * 100));
 

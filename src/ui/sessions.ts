@@ -3,7 +3,6 @@ import { invalidatePageBleed } from '../sim/ambient';
 import { resizeCanvas, resetSimulation } from '../sim/physics';
 import { createInitialState, type SimState } from '../sim/state';
 import { loadSettings } from '../sim/persistence';
-import { bindLobbyFx, setLobbyFxActive } from './lobbyFx';
 import { destroyPixi } from '../sim/pixi/sessionPixi';
 
 export type RunSession = {
@@ -133,7 +132,6 @@ function setLobbyVisible(visible: boolean): void {
   wrap.hidden = visible;
   wrap.classList.toggle('is-hidden', visible);
   document.body.classList.toggle('lobby-open', visible);
-  setLobbyFxActive(visible);
   if (visible) {
     hooks?.closeSettings();
     wrap.classList.remove('settings-open');
@@ -231,6 +229,20 @@ function buildCardShell(session: RunSession): HTMLElement {
   return card;
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function placeCardInDock(card: HTMLElement): void {
+  const dock = runsDock();
+  const newBtn = document.getElementById('btnNewArena');
+  if (newBtn && newBtn.parentElement === dock) {
+    dock.insertBefore(card, newBtn);
+  } else {
+    dock.appendChild(card);
+  }
+}
+
 async function flipToDock(
   stage: HTMLElement,
   card: HTMLElement,
@@ -240,7 +252,9 @@ async function flipToDock(
   const body = card.querySelector('.run-card-body');
   if (!body) return;
   body.appendChild(stage);
-  runsDock().prepend(card);
+  placeCardInDock(card);
+
+  if (prefersReducedMotion()) return;
 
   const last = card.getBoundingClientRect();
   const dx = first.left - last.left;
@@ -263,6 +277,41 @@ async function flipToDock(
           card.style.transition = '';
           card.style.transform = '';
           card.style.zIndex = '';
+          resolve();
+        }, 580);
+      });
+    });
+  });
+}
+
+/** Animate stage from a small source rect (card / + tile) into full arena. */
+async function flipExpand(stage: HTMLElement, first: DOMRect): Promise<void> {
+  if (prefersReducedMotion()) return;
+
+  const last = stage.getBoundingClientRect();
+  if (last.width < 2 || last.height < 2) return;
+
+  const dx = first.left - last.left;
+  const dy = first.top - last.top;
+  const sx = first.width / Math.max(1, last.width);
+  const sy = first.height / Math.max(1, last.height);
+
+  stage.style.transformOrigin = 'top left';
+  stage.style.transition = 'none';
+  stage.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+  stage.style.zIndex = '50';
+  stage.style.willChange = 'transform';
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        stage.style.transition = 'transform 0.55s cubic-bezier(0.22, 1, 0.36, 1)';
+        stage.style.transform = 'translate(0, 0) scale(1, 1)';
+        window.setTimeout(() => {
+          stage.style.transition = '';
+          stage.style.transform = '';
+          stage.style.zIndex = '';
+          stage.style.willChange = '';
           resolve();
         }, 580);
       });
@@ -325,7 +374,6 @@ export function bootstrapSessions(initialState: SimState, sessionHooks: SessionH
   if (bootstrapped) return;
   bootstrapped = true;
   hooks = sessionHooks;
-  bindLobbyFx();
 
   const stage = document.getElementById('activeStage');
   const canvas = document.getElementById('simCanvas');
@@ -354,7 +402,7 @@ export function bootstrapSessions(initialState: SimState, sessionHooks: SessionH
   updateCardMeta(session);
   const body = card.querySelector('.run-card-body');
   body?.appendChild(session.root);
-  runsDock().prepend(card);
+  placeCardInDock(card);
   activeId = null;
   setLobbyVisible(true);
 }
@@ -411,22 +459,26 @@ export async function closeActiveToLobby(): Promise<void> {
 }
 
 /** Start a fresh arena from lobby. */
-export function openNewArena(): void {
+export async function openNewArena(): Promise<void> {
   hooks?.closeSettings();
+  const source = document.getElementById('btnNewArena')?.getBoundingClientRect();
   showArena();
-  mountNewActiveFromTemplate();
-  window.setTimeout(() => {
-    const active = getActiveSessionOrNull();
-    if (active) resizeCanvas(active.state);
-    invalidatePageBleed();
-  }, 50);
+  const session = mountNewActiveFromTemplate();
+  resizeCanvas(session.state);
+  hooks?.syncActive(session.state, session.root);
+  invalidatePageBleed();
+  if (source) await flipExpand(session.root, source);
+  resizeCanvas(session.state);
+  invalidatePageBleed();
 }
 
-export function expandSession(id: string): void {
+export async function expandSession(id: string): Promise<void> {
   const target = sessions.find((s) => s.id === id);
   if (!target || !target.minimized || !target.card) return;
 
   hooks?.closeSettings();
+
+  const first = target.card.getBoundingClientRect();
 
   const current = getActiveSessionOrNull();
   if (current && current.id !== target.id && !current.minimized) {
@@ -438,10 +490,8 @@ export function expandSession(id: string): void {
     updateCardMeta(current);
     const body = card.querySelector('.run-card-body');
     body?.appendChild(current.root);
-    runsDock().prepend(card);
+    placeCardInDock(card);
   }
-
-  showArena();
 
   const settings = playSlot().querySelector('#drawerSettingsContent');
   playSlot().insertBefore(target.root, settings);
@@ -451,8 +501,13 @@ export function expandSession(id: string): void {
   activeId = target.id;
   assignActiveIds(target.root);
 
+  showArena();
   resizeCanvas(target.state);
   hooks?.syncActive(target.state, target.root);
+  invalidatePageBleed();
+
+  await flipExpand(target.root, first);
+  resizeCanvas(target.state);
   invalidatePageBleed();
 }
 
@@ -467,7 +522,7 @@ export async function closeSession(id: string): Promise<void> {
     }
     const other = sessions.find((s) => s.id !== id && s.minimized);
     if (other) {
-      expandSession(other.id);
+      await expandSession(other.id);
     } else {
       await closeActiveToLobby();
       return;

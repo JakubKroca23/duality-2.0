@@ -70,8 +70,8 @@ function collectReflectionBounces(
 }
 
 /**
- * Experimental PixiJS WebGL renderer (parity prototype alongside Canvas 2D).
- * Owns a canvas overlay inside the arena frame; does not replace SimState.
+ * PixiJS WebGL arena renderer — sole visual backend for Duality.
+ * Reads SimState / GfxOptions (including all three shaders) each frame.
  */
 export class PixiRenderer {
   private app: Application | null = null;
@@ -245,6 +245,7 @@ export class PixiRenderer {
     this.sideTexture = null;
     this.gridSize = 0;
     this.lastFull = 0;
+    this.lastLookKey = '';
   }
 
   render(state: SimState): void {
@@ -301,6 +302,8 @@ export class PixiRenderer {
     }
   }
 
+  private lastLookKey = '';
+
   private syncTerritory(state: SimState): void {
     const n = state.physicsOptions.gridSize;
     this.ensureTextures(n);
@@ -310,9 +313,16 @@ export class PixiRenderer {
     this.territorySprite.width = state.boardWidth;
     this.territorySprite.height = state.boardWidth;
 
-    if (!state.gridDirty && this.colorTexture) {
+    const lookKey = [
+      state.gfxOptions.areaSaturation,
+      state.themes[0].tileColor,
+      state.themes[1].tileColor,
+    ].join('|');
+    const lookChanged = lookKey !== this.lastLookKey;
+    if (!state.gridDirty && !lookChanged && this.colorTexture) {
       return;
     }
+    this.lastLookKey = lookKey;
 
     const sat = state.gfxOptions.areaSaturation;
     const day = saturatedTile(state.themes[0].tileColor, sat);

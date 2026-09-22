@@ -33,8 +33,8 @@ export type ShaderEcho = {
 };
 
 export type SimState = {
+  /** Layout probe canvas inside the arena frame (not drawn — Pixi owns the WebGL view). */
   canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
   grid: number[][];
   balls: Ball[];
   particles: Particle[];
@@ -60,20 +60,15 @@ export type SimState = {
   leadTimeDay: number;
   /** Seconds side B (night) held territory majority. */
   leadTimeNight: number;
-  /** 1px-per-cell cache for large grids */
-  gridBitmap: HTMLCanvasElement | null;
+  /** Territory GPU texture needs rebuild. */
   gridDirty: boolean;
 };
 
 export function createInitialState(canvas: HTMLCanvasElement): SimState {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D context unavailable');
-
   const themes = cloneSchemeThemes(SCHEME_INDEX_DEFAULT);
 
   return {
     canvas,
-    ctx,
     grid: [],
     balls: [],
     particles: [],
@@ -95,7 +90,6 @@ export function createInitialState(canvas: HTMLCanvasElement): SimState {
     runTimeSec: 0,
     leadTimeDay: 0,
     leadTimeNight: 0,
-    gridBitmap: null,
     gridDirty: true,
   };
 }

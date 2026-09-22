@@ -15,5 +15,27 @@ services:
       timeout: 3s
       retries: 20
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://duality:duality@db:5432/duality
+      PORT: "8787"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8787"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
 volumes:
   duality_pg:

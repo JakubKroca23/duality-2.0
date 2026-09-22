@@ -298,10 +298,6 @@
                       <span>CRT filtr</span>
                       <input type="checkbox" id="chkScanlines" class="accent-cyan-400" />
                     </label>
-                    <label class="settings-check settings-check-row" title="Experimentální WebGL renderer (PixiJS)">
-                      <span>Pixi (experiment)</span>
-                      <input type="checkbox" id="chkPixiRenderer" class="accent-fuchsia-400" />
-                    </label>
                     <div class="settings-row-meta">
                       <span>Mřížka</span>
                       <input id="sliderGrid" type="range" min="0" max="35" step="5" value="8" class="settings-range settings-range-inline accent-cyan-400" />
@@ -450,59 +446,18 @@
     </div>
 
     <section id="appLobby" class="app-lobby" aria-label="Lobby" hidden>
-      <div class="lobby-stage">
-        <div class="lobby-logo" role="img" aria-label="Duality">
-          <svg class="lobby-logo-mark" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <linearGradient id="lobbyGradA" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#00f6ff" />
-                <stop offset="100%" stop-color="#0088aa" />
-              </linearGradient>
-              <linearGradient id="lobbyGradB" x1="1" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#ff2a6d" />
-                <stop offset="100%" stop-color="#a00040" />
-              </linearGradient>
-              <filter id="lobbyGlowA" x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="2.2" result="b" />
-                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-              <filter id="lobbyGlowB" x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="2.2" result="b" />
-                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            </defs>
-            <!-- Twin mirrored chevrons = dual forces -->
-            <g class="lobby-logo-half lobby-logo-half-a" filter="url(#lobbyGlowA)">
-              <path
-                fill="url(#lobbyGradA)"
-                d="M12 18 L40 8 L40 22 L24 30 L40 38 L40 52 L12 42 Z"
-              />
-              <circle cx="28" cy="30" r="3.5" fill="#031018" />
-            </g>
-            <g class="lobby-logo-half lobby-logo-half-b" filter="url(#lobbyGlowB)">
-              <path
-                fill="url(#lobbyGradB)"
-                d="M68 18 L40 8 L40 22 L56 30 L40 38 L40 52 L68 42 Z"
-              />
-              <circle cx="52" cy="30" r="3.5" fill="#18040c" />
-            </g>
-            <path
-              d="M36 14 L44 30 L36 46"
-              fill="none"
-              stroke="rgba(255,255,255,0.85)"
-              stroke-width="1.8"
-              stroke-linecap="square"
-            />
-          </svg>
-          <h1 class="lobby-logo-word">
-            <span class="lobby-logo-word-a">DUA</span><span class="lobby-logo-word-b">LITY</span>
-          </h1>
-        </div>
-        <button type="button" id="btnNewArena" class="lobby-cta" data-action="new-arena">
-          Nová aréna
+      <div id="runsDock" class="runs-dock" aria-label="Běhy na pozadí">
+        <button
+          type="button"
+          id="btnNewArena"
+          class="run-card-new"
+          data-action="new-arena"
+          title="Nová aréna"
+          aria-label="Nová aréna"
+        >
+          <span class="run-card-new-plus" aria-hidden="true">+</span>
         </button>
       </div>
-      <div id="runsDock" class="runs-dock" aria-label="Běhy na pozadí"></div>
     </section>
     </div>
 
