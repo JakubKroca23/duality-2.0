@@ -41,7 +41,7 @@ function ensureBleedCanvas(): HTMLCanvasElement {
   return created;
 }
 
-/** Arena rect with sim-wrapper translate undone so glow stays put when settings opens. */
+/** Arena canvas only (not the floating toolbar), with sim-wrapper translate undone. */
 function arenaBleedRect(canvas: HTMLCanvasElement): {
   left: number;
   right: number;
@@ -50,7 +50,10 @@ function arenaBleedRect(canvas: HTMLCanvasElement): {
   width: number;
   height: number;
 } {
-  const el = canvas.parentElement ?? canvas;
+  const el =
+    canvas.closest('.canvas-container') ??
+    canvas.parentElement ??
+    canvas;
   const rect = el.getBoundingClientRect();
   const wrapper = document.getElementById('simWrapper');
   if (!wrapper) {

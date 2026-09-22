@@ -1,0 +1,34 @@
+---
+description: Keep APP_CONTEXT.md long-term memory in sync after mechanic changes
+alwaysApply: true
+---
+
+# Update app context memory
+
+After substantive changes to how Duality works, update long-term context **in the same turn** (do not wait to be asked).
+
+## When to update
+
+Update if you changed any of:
+
+- Physics / bounce / territory capture / reset / headless engine
+- Shaders (`light` / `collision` / `reflection`), glow, trails, frontier, bleed
+- `GfxOptions` / `ShaderConfig` / themes / defaults
+- Sessions, settings persistence, API runs, DB schema
+- New modules or moved file responsibilities
+- Renderer backend (Canvas 2D / Pixi)
+
+Skip for pure typo/CSS polish, unrelated refactors, or docs-only edits.
+
+## What to update
+
+1. `docs/APP_CONTEXT.md` (source of truth in repo)
+2. Mirror the same file to agent stores when writable:
+   - `…/c4a5f014-e556-461e-847d-9ec0622fc505/files/duality-2.0-context.md`
+   - `…/u313789205/files/duality-2.0-context.md`
+
+Bump the “Aktualizováno” date. Edit only the sections that changed — keep the doc accurate and concise.
+
+## Habit
+
+If the session touched sim/render/shader/API and you are about to stop, quickly check whether `docs/APP_CONTEXT.md` still matches reality; if not, patch it before finishing.

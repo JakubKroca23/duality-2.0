@@ -17,6 +17,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pixi.js": "^8.21.0",
     "tone": "^15.1.22"
   },
   "devDependencies": {

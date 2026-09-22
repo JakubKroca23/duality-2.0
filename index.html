@@ -8,101 +8,118 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Audiowide&family=JetBrains+Mono:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
   </head>
 
   <body class="flex flex-col items-center justify-start sm:justify-center p-2 sm:p-3 select-none min-h-screen">
+    <div id="workspace" class="workspace flex flex-col items-center w-full max-w-full">
     <div id="simWrapper" class="sim-wrapper flex flex-col items-stretch my-auto">
-      <!-- TOP CONTROL BAR -->
-      <div
-        id="mainToolbar"
-        class="main-toolbar w-full flex items-center justify-between gap-1.5 sm:gap-2 glass-panel p-1.5 sm:p-2 rounded-2xl relative z-40"
-      >
-        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button
-            id="btnPlayPause"
-            class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-cyan-500/15 hover:border-cyan-500/40 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm"
-            title="Pozastavit / Spustit"
-          >
-            <svg id="iconPause" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <svg id="iconPlay" class="w-4 h-4 hidden text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </button>
-
-          <button
-            id="btnReset"
-            class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm"
-            title="Resetovat"
-          >
-            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-
-          <button
-            id="btnSound"
-            class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm"
-            title="Zvuk"
-          >
-            <svg id="iconSoundOn" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
-            </svg>
-            <svg id="iconSoundOff" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
-            </svg>
-          </button>
-
-        </div>
-
-        <div class="flex-1 max-w-[150px] sm:max-w-xs px-1 sm:px-2 flex flex-col justify-center">
-          <div class="flex justify-between items-center text-[11px] sm:text-xs font-semibold mono mb-0.5">
-            <div class="flex items-center gap-1 sm:gap-1.5" id="labelLeft">
-              <span id="dotLeft" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
-              <span id="scoreDay" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
-              <span id="pctDay" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
-            </div>
-            <div class="flex items-center gap-1 sm:gap-1.5" id="labelRight">
-              <span id="pctNight" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
-              <span id="scoreNight" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
-              <span id="dotRight" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
-            </div>
-          </div>
-          <div class="w-full h-1 bg-black/80 rounded-full overflow-hidden flex border border-white/10 shadow-[inset_0_0_4px_rgba(0,0,0,0.8)]">
-            <div id="barDay" class="h-full transition-all duration-150" style="width: 50%"></div>
-            <div id="barNight" class="h-full transition-all duration-150" style="width: 50%"></div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button
-            id="btnToggleSettings"
-            class="h-8 sm:h-9 px-2 sm:px-2.5 flex items-center gap-1.5 bg-white/[0.04] hover:bg-cyan-500/15 hover:border-cyan-500/40 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition text-[11px] font-bold tracking-wider mono uppercase shrink-0"
-            title="Nastavení"
-            aria-expanded="false"
-            aria-controls="drawerSettingsContent"
-          >
-            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-            <span class="hidden sm:inline">NASTAVENÍ</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Arena + settings side panel -->
       <div class="play-row">
-        <div class="arena-stage">
-          <div id="arenaFrame" class="canvas-container relative">
-            <canvas id="simCanvas"></canvas>
-            <div id="shaderScanlines" class="scanlines-overlay"></div>
+        <div id="activeStage" class="arena-stage" data-session-stage>
+          <div
+            id="mainToolbar"
+            class="main-toolbar w-full flex items-center justify-between gap-1.5 sm:gap-2 relative z-40"
+          >
+            <div class="flex items-center gap-1 sm:gap-1.5 shrink-0 toolbar-actions-left">
+              <button
+                id="btnPlayPause" data-action="play-pause" data-role="btn-play-pause"
+                class="toolbar-btn"
+                title="Pozastavit / Spustit"
+              >
+                <svg id="iconPause" data-role="icon-pause" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <svg id="iconPlay" data-role="icon-play" class="w-4 h-4 hidden text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </button>
+
+              <button
+                id="btnReset" data-action="reset" data-role="btn-reset"
+                class="toolbar-btn"
+                title="Resetovat"
+              >
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </button>
+
+              <button
+                id="btnSound" data-action="sound" data-role="btn-sound"
+                class="toolbar-btn"
+                title="Zvuk"
+              >
+                <svg id="iconSoundOn" data-role="icon-sound-on" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                </svg>
+                <svg id="iconSoundOff" data-role="icon-sound-off" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="flex-1 min-w-0 max-w-[200px] sm:max-w-sm px-1 sm:px-2 flex flex-col justify-center gap-0.5 toolbar-scoreblock">
+              <div class="flex justify-between items-center text-[11px] sm:text-xs font-semibold mono">
+                <div class="flex items-center gap-1 sm:gap-1.5" id="labelLeft" data-role="label-left">
+                  <span id="dotLeft" data-role="dot-left" class="w-1.5 h-1.5 shadow-[0_0_8px_currentColor]"></span>
+                  <span id="scoreDay" data-role="score-day" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+                  <span id="pctDay" data-role="pct-day" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+                </div>
+                <div class="flex items-center gap-1 sm:gap-1.5" id="labelRight" data-role="label-right">
+                  <span id="pctNight" data-role="pct-night" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+                  <span id="scoreNight" data-role="score-night" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+                  <span id="dotRight" data-role="dot-right" class="w-1.5 h-1.5 shadow-[0_0_8px_currentColor]"></span>
+                </div>
+              </div>
+              <div class="w-full h-1 bg-black/80 overflow-hidden flex border border-white/10 shadow-[inset_0_0_4px_rgba(0,0,0,0.8)]">
+                <div id="barDay" data-role="bar-day" class="h-full transition-all duration-150" style="width: 50%"></div>
+                <div id="barNight" data-role="bar-night" class="h-full transition-all duration-150" style="width: 50%"></div>
+              </div>
+              <div class="toolbar-stats flex items-center justify-between gap-2 mono text-[9px] sm:text-[10px] text-slate-400">
+                <span id="statRunTime" data-role="stat-run-time" class="tabular-nums tracking-tight text-slate-300" title="Čas běhu">0:00</span>
+                <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <span id="statLeadDay" data-role="stat-lead-day" class="tabular-nums truncate" title="Podíl času s převahou A">▲ 0%</span>
+                  <span id="statLeadNight" data-role="stat-lead-night" class="tabular-nums truncate" title="Podíl času s převahou B">▲ 0%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-0.5 sm:gap-1 shrink-0 toolbar-actions-right">
+              <button
+                id="btnToggleSettings" data-action="settings" data-role="btn-settings"
+                class="toolbar-btn-ghost"
+                title="Nastavení"
+                aria-label="Nastavení"
+                aria-expanded="false"
+                aria-controls="drawerSettingsContent"
+              >
+                <svg class="text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+              </button>
+              <button
+                id="btnCloseArena"
+                class="toolbar-btn-ghost"
+                title="Zavřít arénu"
+                aria-label="Zavřít arénu"
+                data-action="close-arena"
+                data-role="btn-close-arena"
+              >
+                <svg class="text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="arenaFrame" data-role="arena-frame" class="canvas-container relative">
+            <canvas id="simCanvas" data-role="sim-canvas"></canvas>
+            <div id="shaderScanlines" data-role="shader-scanlines" class="scanlines-overlay"></div>
             <div class="vignette-overlay"></div>
           </div>
         </div>
@@ -141,9 +158,6 @@
               </button>
               <button type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="shaders" id="tabSettingsShaders">
                 Shadery
-              </button>
-              <button type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="runs" id="tabSettingsRuns">
-                Běhy
               </button>
             </div>
 
@@ -194,6 +208,20 @@
                     </button>
                     <div id="themeDropdownMenu" class="hidden theme-dropdown-panel">
                       <div id="themeListContainer" class="space-y-0.5"></div>
+                      <div class="theme-save-row">
+                        <input
+                          id="inputThemeName"
+                          type="text"
+                          maxlength="32"
+                          placeholder="Název nového tématu"
+                          class="theme-save-input"
+                          autocomplete="off"
+                          spellcheck="false"
+                        />
+                        <button id="btnSaveTheme" type="button" class="theme-save-btn" title="Uložit aktuální vzhled jako téma">
+                          Uložit
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -269,6 +297,10 @@
                     <label class="settings-check settings-check-row">
                       <span>CRT filtr</span>
                       <input type="checkbox" id="chkScanlines" class="accent-cyan-400" />
+                    </label>
+                    <label class="settings-check settings-check-row" title="Experimentální WebGL renderer (PixiJS)">
+                      <span>Pixi (experiment)</span>
+                      <input type="checkbox" id="chkPixiRenderer" class="accent-fuchsia-400" />
                     </label>
                     <div class="settings-row-meta">
                       <span>Mřížka</span>
@@ -411,52 +443,126 @@
                 </div>
               </div>
 
-              <div class="settings-tab-panel" data-settings-panel="runs" role="tabpanel" aria-labelledby="tabSettingsRuns" aria-hidden="true">
-                <div class="settings-list">
-                  <div class="settings-row">
-                    <div class="settings-row-meta">
-                      <span>Server</span>
-                      <span id="lblApiStatus" class="settings-val">…</span>
-                    </div>
-                    <p class="settings-hint-block">
-                      Dlouhodobé simulace běží na lokálním API, i když zavřeš prohlížeč (dokud běží API).
-                    </p>
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row-meta">
-                      <span>Nový běh</span>
-                    </div>
-                    <div class="runs-create-row">
-                      <input id="inputRunName" type="text" class="settings-ms runs-name-input" placeholder="Název" maxlength="40" />
-                      <label class="settings-fade">
-                        <span>×čas</span>
-                        <input id="inputRunSpeedScale" type="number" min="0.5" max="50" step="0.5" value="5" class="settings-ms" />
-                      </label>
-                      <button type="button" id="btnStartRun" class="settings-modal-reset">Start</button>
-                    </div>
-                    <button type="button" id="btnSavePreset" class="settings-modal-reset runs-full-btn">Uložit aktuální nastavení jako preset</button>
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row-meta">
-                      <span>Graf (den %)</span>
-                      <span id="lblRunChartMeta" class="settings-val">—</span>
-                    </div>
-                    <canvas id="runsChart" class="runs-chart" width="260" height="90"></canvas>
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row-meta">
-                      <span>Kontejnery</span>
-                      <button type="button" id="btnRefreshRuns" class="settings-modal-reset">Obnovit</button>
-                    </div>
-                    <div id="runsList" class="runs-list"></div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </aside>
       </div>
     </div>
+
+    <section id="appLobby" class="app-lobby" aria-label="Lobby" hidden>
+      <div class="lobby-stage">
+        <div class="lobby-logo" role="img" aria-label="Duality">
+          <svg class="lobby-logo-mark" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="lobbyGradA" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#00f6ff" />
+                <stop offset="100%" stop-color="#0088aa" />
+              </linearGradient>
+              <linearGradient id="lobbyGradB" x1="1" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ff2a6d" />
+                <stop offset="100%" stop-color="#a00040" />
+              </linearGradient>
+              <filter id="lobbyGlowA" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="2.2" result="b" />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="lobbyGlowB" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="2.2" result="b" />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            <!-- Twin mirrored chevrons = dual forces -->
+            <g class="lobby-logo-half lobby-logo-half-a" filter="url(#lobbyGlowA)">
+              <path
+                fill="url(#lobbyGradA)"
+                d="M12 18 L40 8 L40 22 L24 30 L40 38 L40 52 L12 42 Z"
+              />
+              <circle cx="28" cy="30" r="3.5" fill="#031018" />
+            </g>
+            <g class="lobby-logo-half lobby-logo-half-b" filter="url(#lobbyGlowB)">
+              <path
+                fill="url(#lobbyGradB)"
+                d="M68 18 L40 8 L40 22 L56 30 L40 38 L40 52 L68 42 Z"
+              />
+              <circle cx="52" cy="30" r="3.5" fill="#18040c" />
+            </g>
+            <path
+              d="M36 14 L44 30 L36 46"
+              fill="none"
+              stroke="rgba(255,255,255,0.85)"
+              stroke-width="1.8"
+              stroke-linecap="square"
+            />
+          </svg>
+          <h1 class="lobby-logo-word">
+            <span class="lobby-logo-word-a">DUA</span><span class="lobby-logo-word-b">LITY</span>
+          </h1>
+        </div>
+        <button type="button" id="btnNewArena" class="lobby-cta" data-action="new-arena">
+          Nová aréna
+        </button>
+      </div>
+      <div id="runsDock" class="runs-dock" aria-label="Běhy na pozadí"></div>
+    </section>
+    </div>
+
+    <template id="tplArenaStage">
+      <div class="arena-stage" data-session-stage>
+        <div class="main-toolbar w-full flex items-center justify-between gap-1.5 sm:gap-2 glass-panel p-1.5 sm:p-2 rounded-2xl relative z-40">
+          <div class="flex items-center gap-1 sm:gap-1.5 shrink-0 toolbar-actions-left">
+            <button type="button" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-cyan-500/15 hover:border-cyan-500/40 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Pozastavit / Spustit" data-action="play-pause" data-role="btn-play-pause">
+              <svg data-role="icon-pause" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <svg data-role="icon-play" class="w-4 h-4 hidden text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+            <button type="button" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Resetovat" data-action="reset" data-role="btn-reset">
+              <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+            <button type="button" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Zvuk" data-action="sound" data-role="btn-sound">
+              <svg data-role="icon-sound-on" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+              <svg data-role="icon-sound-off" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+            </button>
+          </div>
+          <div class="flex-1 min-w-0 max-w-[200px] sm:max-w-sm px-1 sm:px-2 flex flex-col justify-center gap-0.5 toolbar-scoreblock">
+            <div class="flex justify-between items-center text-[11px] sm:text-xs font-semibold mono">
+              <div class="flex items-center gap-1 sm:gap-1.5" data-role="label-left">
+                <span data-role="dot-left" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
+                <span data-role="score-day" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+                <span data-role="pct-day" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+              </div>
+              <div class="flex items-center gap-1 sm:gap-1.5" data-role="label-right">
+                <span data-role="pct-night" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+                <span data-role="score-night" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+                <span data-role="dot-right" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
+              </div>
+            </div>
+            <div class="w-full h-1 bg-black/80 rounded-full overflow-hidden flex border border-white/10 shadow-[inset_0_0_4px_rgba(0,0,0,0.8)]">
+              <div data-role="bar-day" class="h-full transition-all duration-150" style="width: 50%"></div>
+              <div data-role="bar-night" class="h-full transition-all duration-150" style="width: 50%"></div>
+            </div>
+            <div class="toolbar-stats flex items-center justify-between gap-2 mono text-[9px] sm:text-[10px] text-slate-400">
+              <span data-role="stat-run-time" class="tabular-nums tracking-tight text-slate-300" title="Čas běhu">0:00</span>
+              <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <span data-role="stat-lead-day" class="tabular-nums truncate" title="Podíl času s převahou A">▲ 0%</span>
+                <span data-role="stat-lead-night" class="tabular-nums truncate" title="Podíl času s převahou B">▲ 0%</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-0.5 sm:gap-1 shrink-0 toolbar-actions-right">
+            <button type="button" class="toolbar-btn-ghost" title="Nastavení" aria-label="Nastavení" data-action="settings" data-role="btn-settings">
+              <svg class="text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+            <button type="button" class="toolbar-btn-ghost" title="Zavřít arénu" aria-label="Zavřít arénu" data-action="close-arena" data-role="btn-close-arena">
+              <svg class="text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        </div>
+        <div data-role="arena-frame" class="canvas-container relative">
+          <canvas data-role="sim-canvas"></canvas>
+          <div data-role="shader-scanlines" class="scanlines-overlay"></div>
+          <div class="vignette-overlay"></div>
+        </div>
+      </div>
+    </template>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

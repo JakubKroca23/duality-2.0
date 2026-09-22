@@ -9,14 +9,51 @@ import {
   defaultGfxOptions,
   defaultPhysicsOptions,
 } from '../config/constants';
-import { CYBER_SCHEMES, applySchemeLookToGfx, cloneSchemeLook, cloneSchemeThemes, tileFromBall } from '../config/themes';
+import {
+  applySchemeLookToGfx,
+  cloneSchemeLook,
+  cloneSchemeThemes,
+  listAllSchemes,
+  resolveScheme,
+  schemeLookFromGfx,
+  tileFromBall,
+  type CyberScheme,
+} from '../config/themes';
 import { initAudio } from '../sim/audio';
 import { loadSettings, saveSettings } from '../sim/persistence';
 import { applyBallRadii, resetSimulation, resizeCanvas } from '../sim/physics';
 import { markGridDirty, updateScoreboard } from '../sim/render';
 import { invalidatePageBleed } from '../sim/ambient';
-import { bindRunsPanel } from './runsPanel';
+import { destroyAllPixi } from '../sim/pixi/sessionPixi';
+import { getRendererMode, setRendererMode } from '../sim/rendererMode';
+import {
+  addUserScheme,
+  getUserSchemes,
+  isUserSchemeIndex,
+  loadUserSchemes,
+  removeUserScheme,
+  slugifyThemeName,
+} from '../sim/userThemes';
+import {
+  closeActiveToLobby,
+  closeSession,
+  expandSession,
+  findSessionByRoot,
+  getActiveSession,
+  getActiveSessionOrNull,
+  getActiveState,
+  getSessions,
+  openNewArena,
+  resizeAllSessions,
+} from './sessions';
 import type { SimState } from '../sim/state';
+
+let settingsCloser: (() => void) | null = null;
+
+/** Close settings from outside (e.g. minimize run). */
+export function closeSettingsPanel(): void {
+  settingsCloser?.();
+}
 
 function formatSpeed(mps: number): string {
   if (mps < 10) return `${mps.toFixed(1)} m/s`;
@@ -60,7 +97,7 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 export function syncColorsUI(state: SimState): void {
-  const currentScheme = CYBER_SCHEMES[state.currentSchemeIndex];
+  const currentScheme = resolveScheme(state.currentSchemeIndex, getUserSchemes());
   const leftCol = state.themes[TYPE_DAY].ballColor;
   const rightCol = state.themes[TYPE_NIGHT].ballColor;
 
@@ -75,24 +112,50 @@ export function syncColorsUI(state: SimState): void {
   themeBtnDotNight.style.backgroundColor = rightCol;
   themeBtnDotNight.style.boxShadow = `0 0 6px ${rightCol}`;
 
-  el('labelLeft').style.color = leftCol;
-  el('labelRight').style.color = rightCol;
+  let root: ParentNode = document;
+  try {
+    root = getActiveSession().root;
+  } catch {
+    /* before sessions boot */
+  }
 
-  const dotL = el('dotLeft');
-  dotL.style.backgroundColor = leftCol;
-  dotL.style.boxShadow = `0 0 10px ${leftCol}`;
+  const q = (role: string, id: string): HTMLElement | null =>
+    (root.querySelector(`[data-role="${role}"]`) as HTMLElement | null) ??
+    document.getElementById(id);
 
-  const dotR = el('dotRight');
-  dotR.style.backgroundColor = rightCol;
-  dotR.style.boxShadow = `0 0 10px ${rightCol}`;
+  const labelLeft = q('label-left', 'labelLeft');
+  const labelRight = q('label-right', 'labelRight');
+  if (labelLeft) labelLeft.style.color = leftCol;
+  if (labelRight) labelRight.style.color = rightCol;
 
-  const barDay = el('barDay');
-  barDay.style.backgroundColor = leftCol;
-  barDay.style.boxShadow = `0 0 8px ${leftCol}`;
+  const leadDay = q('stat-lead-day', 'statLeadDay');
+  const leadNight = q('stat-lead-night', 'statLeadNight');
+  if (leadDay) leadDay.style.color = leftCol;
+  if (leadNight) leadNight.style.color = rightCol;
 
-  const barNight = el('barNight');
-  barNight.style.backgroundColor = rightCol;
-  barNight.style.boxShadow = `0 0 8px ${rightCol}`;
+  const dotL = q('dot-left', 'dotLeft');
+  if (dotL) {
+    dotL.style.backgroundColor = leftCol;
+    dotL.style.boxShadow = `0 0 10px ${leftCol}`;
+  }
+
+  const dotR = q('dot-right', 'dotRight');
+  if (dotR) {
+    dotR.style.backgroundColor = rightCol;
+    dotR.style.boxShadow = `0 0 10px ${rightCol}`;
+  }
+
+  const barDay = q('bar-day', 'barDay');
+  if (barDay) {
+    barDay.style.backgroundColor = leftCol;
+    barDay.style.boxShadow = `0 0 8px ${leftCol}`;
+  }
+
+  const barNight = q('bar-night', 'barNight');
+  if (barNight) {
+    barNight.style.backgroundColor = rightCol;
+    barNight.style.boxShadow = `0 0 8px ${rightCol}`;
+  }
 
   const colorDay = document.getElementById('colorDay') as HTMLInputElement | null;
   const colorNight = document.getElementById('colorNight') as HTMLInputElement | null;
@@ -124,28 +187,43 @@ export function renderThemeDropdownList(state: SimState): void {
   const container = el('themeListContainer');
   container.innerHTML = '';
 
-  CYBER_SCHEMES.forEach((scheme, index) => {
+  const schemes = listAllSchemes(getUserSchemes());
+  schemes.forEach((scheme, index) => {
     const item = document.createElement('div');
     const isActive = !state.customColors && index === state.currentSchemeIndex;
+    const isUser = isUserSchemeIndex(index);
     item.className = `theme-item settings-theme-item flex items-center justify-between ${isActive ? 'active' : ''}`;
 
     item.innerHTML = `
-      <div class="flex items-center gap-2">
-        <div class="flex items-center -space-x-1">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="flex items-center -space-x-1 shrink-0">
           <span class="w-2 h-2 rounded-full" style="background-color: ${scheme[TYPE_DAY].ballColor}; box-shadow: 0 0 5px ${scheme[TYPE_DAY].ballColor};"></span>
           <span class="w-2 h-2 rounded-full" style="background-color: ${scheme[TYPE_NIGHT].ballColor}; box-shadow: 0 0 5px ${scheme[TYPE_NIGHT].ballColor};"></span>
         </div>
-        <div>
-          <span class="font-bold text-[9px] text-slate-100 mono block tracking-wider leading-tight">${scheme.name}</span>
+        <div class="min-w-0">
+          <span class="font-bold text-[9px] text-slate-100 mono block tracking-wider leading-tight truncate">${scheme.name}</span>
           <span class="text-[7.5px] text-slate-400 mono opacity-80">${scheme.tag}</span>
         </div>
       </div>
+      ${
+        isUser
+          ? `<button type="button" class="theme-item-delete" data-theme-delete="${scheme.id}" title="Smazat téma" aria-label="Smazat téma">×</button>`
+          : ''
+      }
     `;
 
     item.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-theme-delete]')) return;
       e.stopPropagation();
       selectTheme(state, index);
       closeThemeDropdown();
+    });
+
+    const deleteBtn = item.querySelector<HTMLButtonElement>('[data-theme-delete]');
+    deleteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteUserTheme(state, scheme.id);
     });
 
     container.appendChild(item);
@@ -162,17 +240,71 @@ function closeThemeDropdown(): void {
 let refreshSettingsInputs: (() => void) | null = null;
 
 function selectTheme(state: SimState, index: number): void {
+  const users = getUserSchemes();
   state.currentSchemeIndex = index;
   state.customColors = false;
-  state.themes = cloneSchemeThemes(index);
+  state.themes = cloneSchemeThemes(index, users);
   state.customDay = state.themes[TYPE_DAY].ballColor;
   state.customNight = state.themes[TYPE_NIGHT].ballColor;
-  applySchemeLookToGfx(state.gfxOptions, cloneSchemeLook(index));
+  applySchemeLookToGfx(state.gfxOptions, cloneSchemeLook(index, users));
   syncColorsUI(state);
   renderThemeDropdownList(state);
   applyBallRadii(state);
   refreshSettingsInputs?.();
   markGridDirty(state);
+  saveSettings(state);
+}
+
+function saveCurrentAsTheme(state: SimState): void {
+  const input = el<HTMLInputElement>('inputThemeName');
+  const name = input.value.trim();
+  if (!name) {
+    input.focus();
+    input.classList.add('theme-save-input-invalid');
+    window.setTimeout(() => input.classList.remove('theme-save-input-invalid'), 600);
+    return;
+  }
+
+  const slug = slugifyThemeName(name);
+  const id = `user-${slug}-${Date.now().toString(36)}`;
+  const scheme: CyberScheme = {
+    id,
+    name: name.slice(0, 32).toUpperCase(),
+    tag: 'CUSTOM',
+    [TYPE_DAY]: { ...state.themes[TYPE_DAY] },
+    [TYPE_NIGHT]: { ...state.themes[TYPE_NIGHT] },
+    look: schemeLookFromGfx(state.gfxOptions),
+  };
+
+  const index = addUserScheme(scheme);
+  input.value = '';
+  selectTheme(state, index);
+  closeThemeDropdown();
+}
+
+function deleteUserTheme(state: SimState, id: string): void {
+  const before = getUserSchemes();
+  const activeId = state.customColors
+    ? null
+    : resolveScheme(state.currentSchemeIndex, before).id;
+
+  if (!removeUserScheme(id)) return;
+
+  const after = getUserSchemes();
+  if (activeId === id) {
+    selectTheme(state, SCHEME_INDEX_DEFAULT);
+    return;
+  }
+
+  if (activeId) {
+    const nextIndex = listAllSchemes(after).findIndex((s) => s.id === activeId);
+    if (nextIndex >= 0) state.currentSchemeIndex = nextIndex;
+  } else if (state.currentSchemeIndex >= listAllSchemes(after).length) {
+    state.currentSchemeIndex = SCHEME_INDEX_DEFAULT;
+  }
+
+  renderThemeDropdownList(state);
+  syncColorsUI(state);
   saveSettings(state);
 }
 
@@ -190,25 +322,48 @@ function toggleThemeDropdown(): void {
   }
 }
 
-export function bindControls(state: SimState): void {
-  loadSettings(state);
+export function bindControls(_initial?: SimState): void {
+  const state = new Proxy({} as SimState, {
+    get(_target, prop) {
+      return Reflect.get(getActiveState(), prop);
+    },
+    set(_target, prop, value) {
+      return Reflect.set(getActiveState(), prop, value);
+    },
+  });
+
+  loadUserSchemes();
+  loadSettings(getActiveState());
 
   const drawerSettingsContent = el('drawerSettingsContent');
-  const btnToggleSettings = el<HTMLButtonElement>('btnToggleSettings');
 
   let settingsOpen = false;
 
   function syncPanelButtons(): void {
-    btnToggleSettings.classList.toggle('nav-btn-active-cyan', settingsOpen);
-    btnToggleSettings.setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
+    const btn = document.getElementById('btnToggleSettings') as HTMLButtonElement | null;
+    if (btn) {
+      btn.classList.toggle('nav-btn-active-cyan', settingsOpen);
+      btn.setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
+    }
     drawerSettingsContent.classList.toggle('open', settingsOpen);
     drawerSettingsContent.setAttribute('aria-hidden', settingsOpen ? 'false' : 'true');
     document.getElementById('simWrapper')?.classList.toggle('settings-open', settingsOpen);
+    document.body.classList.toggle('settings-open', settingsOpen);
     document.body.classList.toggle('settings-drawer-open', settingsOpen);
     invalidatePageBleed();
+    const active = getActiveSessionOrNull();
+    if (active && !active.minimized) {
+      requestAnimationFrame(() => resizeCanvas(active.state));
+      window.setTimeout(() => {
+        resizeCanvas(active.state);
+        invalidatePageBleed();
+      }, 700);
+    }
   }
 
   function openSettings(): void {
+    const active = getActiveSessionOrNull();
+    if (!active || active.minimized) return;
     settingsOpen = true;
     syncPanelButtons();
   }
@@ -218,6 +373,8 @@ export function bindControls(state: SimState): void {
     closeThemeDropdown();
     syncPanelButtons();
   }
+
+  settingsCloser = closeSettings;
 
   function toggleSettings(): void {
     if (settingsOpen) closeSettings();
@@ -248,22 +405,118 @@ export function bindControls(state: SimState): void {
     });
   });
 
-  btnToggleSettings.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleSettings();
-  });
-
   el('btnCloseSettings').addEventListener('click', (e) => {
     e.stopPropagation();
     closeSettings();
   });
 
+  const workspace = document.getElementById('workspace') ?? document.body;
+
+  function syncPlayIcons(sessionRoot: HTMLElement, running: boolean): void {
+    const iconPlay = sessionRoot.querySelector('[data-role="icon-play"]');
+    const iconPause = sessionRoot.querySelector('[data-role="icon-pause"]');
+    iconPlay?.classList.toggle('hidden', running);
+    iconPause?.classList.toggle('hidden', !running);
+  }
+
+  function syncSoundIcons(sessionRoot: HTMLElement, on: boolean): void {
+    const iconOn = sessionRoot.querySelector('[data-role="icon-sound-on"]');
+    const iconOff = sessionRoot.querySelector('[data-role="icon-sound-off"]');
+    iconOn?.classList.toggle('hidden', !on);
+    iconOff?.classList.toggle('hidden', on);
+  }
+
+  workspace.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    if (!action) return;
+
+    if (action === 'expand-run' || action === 'close-run') {
+      const card = target.closest<HTMLElement>('.run-card');
+      const id = card?.dataset.sessionId;
+      if (!id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (action === 'expand-run') expandSession(id);
+      else void closeSession(id);
+      return;
+    }
+
+    if (action === 'new-arena') {
+      e.stopPropagation();
+      openNewArena();
+      return;
+    }
+
+    const session = findSessionByRoot(target);
+    if (!session) {
+      if (action === 'settings') {
+        e.stopPropagation();
+        toggleSettings();
+      }
+      return;
+    }
+
+    if (action === 'play-pause') {
+      session.state.isRunning = !session.state.isRunning;
+      syncPlayIcons(session.root, session.state.isRunning);
+      return;
+    }
+    if (action === 'reset') {
+      resetSimulation(session.state, () => {
+        syncColorsUI(session.state);
+        updateScoreboard(session.state, session.root);
+      });
+      return;
+    }
+    if (action === 'sound') {
+      session.state.soundEnabled = !session.state.soundEnabled;
+      if (session.state.soundEnabled) initAudio();
+      syncSoundIcons(session.root, session.state.soundEnabled);
+      try {
+        saveSettings(getActiveState());
+      } catch {
+        saveSettings(session.state);
+      }
+      return;
+    }
+    if (action === 'close-arena') {
+      e.stopPropagation();
+      if (session.minimized) return;
+      void closeActiveToLobby();
+      return;
+    }
+    if (action === 'settings') {
+      e.stopPropagation();
+      if (!session.minimized) {
+        openSettings();
+      }
+    }
+  });
+
+  // Keep legacy id listeners as no-ops duplicates avoided — play/reset/sound handled above.
   const btnCurrentThemeTrigger = el('btnCurrentThemeTrigger');
   const themeSelectorContainer = el('themeSelectorContainer');
 
   btnCurrentThemeTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleThemeDropdown();
+  });
+
+  const btnSaveTheme = el<HTMLButtonElement>('btnSaveTheme');
+  const inputThemeName = el<HTMLInputElement>('inputThemeName');
+  btnSaveTheme.addEventListener('click', (e) => {
+    e.stopPropagation();
+    saveCurrentAsTheme(state);
+  });
+  inputThemeName.addEventListener('click', (e) => e.stopPropagation());
+  inputThemeName.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveCurrentAsTheme(state);
+    }
   });
 
   document.addEventListener('click', (e) => {
@@ -276,45 +529,6 @@ export function bindControls(state: SimState): void {
       closeThemeDropdown();
       if (settingsOpen) closeSettings();
     }
-  });
-
-  const btnPlayPause = el('btnPlayPause');
-  const iconPlay = el('iconPlay');
-  const iconPause = el('iconPause');
-
-  btnPlayPause.addEventListener('click', () => {
-    state.isRunning = !state.isRunning;
-    if (state.isRunning) {
-      iconPause.classList.remove('hidden');
-      iconPlay.classList.add('hidden');
-    } else {
-      iconPause.classList.add('hidden');
-      iconPlay.classList.remove('hidden');
-    }
-  });
-
-  el('btnReset').addEventListener('click', () => {
-    resetSimulation(state, () => {
-      syncColorsUI(state);
-      updateScoreboard(state);
-    });
-  });
-
-  const btnSound = el('btnSound');
-  const iconSoundOn = el('iconSoundOn');
-  const iconSoundOff = el('iconSoundOff');
-
-  btnSound.addEventListener('click', () => {
-    state.soundEnabled = !state.soundEnabled;
-    if (state.soundEnabled) {
-      initAudio();
-      iconSoundOn.classList.remove('hidden');
-      iconSoundOff.classList.add('hidden');
-    } else {
-      iconSoundOn.classList.add('hidden');
-      iconSoundOff.classList.remove('hidden');
-    }
-    saveSettings(state);
   });
 
   const sliderSpeedPhysics = el<HTMLInputElement>('sliderSpeedPhysics');
@@ -336,7 +550,7 @@ export function bindControls(state: SimState): void {
     lblBallsVal.textContent = `${state.physicsOptions.ballsPerSide} na tým`;
     resetSimulation(state, () => {
       syncColorsUI(state);
-      updateScoreboard(state);
+      updateScoreboard(state, getActiveSession().root);
     });
     saveSettings(state);
   });
@@ -349,7 +563,7 @@ export function bindControls(state: SimState): void {
     resizeCanvas(state);
     resetSimulation(state, () => {
       syncColorsUI(state);
-      updateScoreboard(state);
+      updateScoreboard(state, getActiveSession().root);
     });
     saveSettings(state);
   });
@@ -377,11 +591,27 @@ export function bindControls(state: SimState): void {
   });
 
   const chkScanlines = el<HTMLInputElement>('chkScanlines');
-  const shaderScanlines = el('shaderScanlines');
+  const syncScanlinesOverlay = (): void => {
+    const on = getActiveState().gfxOptions.scanlines;
+    document.querySelectorAll<HTMLElement>('[data-role="shader-scanlines"]').forEach((node) => {
+      node.style.opacity = on ? '0.65' : '0';
+    });
+  };
   chkScanlines.addEventListener('change', (e) => {
     state.gfxOptions.scanlines = (e.target as HTMLInputElement).checked;
-    shaderScanlines.style.opacity = state.gfxOptions.scanlines ? '0.65' : '0';
+    syncScanlinesOverlay();
     saveSettings(state);
+  });
+
+  const chkPixiRenderer = el<HTMLInputElement>('chkPixiRenderer');
+  chkPixiRenderer.checked = getRendererMode() === 'pixi';
+  chkPixiRenderer.addEventListener('change', (e) => {
+    const on = (e.target as HTMLInputElement).checked;
+    // Always tear down so a previous failed init can retry.
+    destroyAllPixi();
+    setRendererMode(on ? 'pixi' : 'canvas2d');
+    for (const session of getSessions()) markGridDirty(session.state);
+    invalidatePageBleed();
   });
 
   const sliderGrid = el<HTMLInputElement>('sliderGrid');
@@ -632,12 +862,11 @@ export function bindControls(state: SimState): void {
   });
 
   function applySettingsToInputs(): void {
-    if (state.soundEnabled) {
-      iconSoundOn.classList.remove('hidden');
-      iconSoundOff.classList.add('hidden');
-    } else {
-      iconSoundOn.classList.add('hidden');
-      iconSoundOff.classList.remove('hidden');
+    try {
+      syncSoundIcons(getActiveSession().root, getActiveState().soundEnabled);
+      syncPlayIcons(getActiveSession().root, getActiveState().isRunning);
+    } catch {
+      /* sessions not ready */
     }
 
     sliderSpeedPhysics.value = String(speedToSlider(state.physicsOptions.speedMps));
@@ -660,7 +889,9 @@ export function bindControls(state: SimState): void {
     chkTrailSolid.checked = state.gfxOptions.trailSolid;
 
     chkScanlines.checked = state.gfxOptions.scanlines;
-    shaderScanlines.style.opacity = state.gfxOptions.scanlines ? '0.65' : '0';
+    syncScanlinesOverlay();
+
+    chkPixiRenderer.checked = getRendererMode() === 'pixi';
 
     sliderGrid.value = String(Math.round(state.gfxOptions.gridOpacity * 100));
 
@@ -721,7 +952,6 @@ export function bindControls(state: SimState): void {
   applySettingsToInputs();
   refreshSettingsInputs = applySettingsToInputs;
   renderThemeDropdownList(state);
-  bindRunsPanel(state);
 
   el('btnResetAllDefaults').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -740,11 +970,13 @@ export function bindControls(state: SimState): void {
     applyBallRadii(state);
     resetSimulation(state, () => {
       syncColorsUI(state);
-      updateScoreboard(state);
+      updateScoreboard(state, getActiveSession().root);
     });
     markGridDirty(state);
     saveSettings(state);
   });
 
-  window.addEventListener('resize', () => resizeCanvas(state));
+  window.addEventListener('resize', () => {
+    resizeAllSessions();
+  });
 }

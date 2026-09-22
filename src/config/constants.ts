@@ -74,7 +74,7 @@ export type GfxOptions = {
   lightShader: ShaderConfig;
   /** Brief flash on dividing-line collisions. */
   collisionShader: ShaderConfig;
-  /** Glow from walls / frontiers toward the ball. */
+  /** Glow on the black arena frame when a ball nears an outer wall. */
   reflectionShader: ShaderConfig;
 
   /** Ball radius scale % (50–200). */

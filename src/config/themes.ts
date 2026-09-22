@@ -241,17 +241,57 @@ export const CYBER_SCHEMES: CyberScheme[] = [
 
 export type ThemesMap = Record<Side, ThemeSide>;
 
-export function cloneSchemeThemes(index: number): ThemesMap {
-  const scheme = CYBER_SCHEMES[Math.max(0, Math.min(CYBER_SCHEMES.length - 1, index))];
+/** Built-in + user-saved schemes for picker / index resolution. */
+export function listAllSchemes(userSchemes: CyberScheme[] = []): CyberScheme[] {
+  return userSchemes.length === 0 ? CYBER_SCHEMES : [...CYBER_SCHEMES, ...userSchemes];
+}
+
+export function resolveScheme(index: number, userSchemes: CyberScheme[] = []): CyberScheme {
+  const all = listAllSchemes(userSchemes);
+  return all[Math.max(0, Math.min(all.length - 1, index))];
+}
+
+export function cloneSchemeThemes(index: number, userSchemes: CyberScheme[] = []): ThemesMap {
+  const scheme = resolveScheme(index, userSchemes);
   return {
     [TYPE_DAY]: { ...scheme[TYPE_DAY] },
     [TYPE_NIGHT]: { ...scheme[TYPE_NIGHT] },
   };
 }
 
-export function cloneSchemeLook(index: number): SchemeLook {
-  const scheme = CYBER_SCHEMES[Math.max(0, Math.min(CYBER_SCHEMES.length - 1, index))];
-  return look(scheme.look);
+export function cloneSchemeLook(index: number, userSchemes: CyberScheme[] = []): SchemeLook {
+  return look(resolveScheme(index, userSchemes).look);
+}
+
+/** Snapshot current GFX into a theme look payload. */
+export function schemeLookFromGfx(gfx: GfxOptions): SchemeLook {
+  return look({
+    glowIntensity: gfx.glowIntensity,
+    maxTrail: gfx.maxTrail,
+    trailSolid: gfx.trailSolid,
+    particleCount: gfx.particleCount,
+    gridOpacity: gfx.gridOpacity,
+    scanlines: gfx.scanlines,
+    areaSaturation: gfx.areaSaturation,
+    frontierColor: gfx.frontierColor,
+    frontierStrength: gfx.frontierStrength,
+    ballScale: gfx.ballScale,
+    lightShader: cloneShaderConfig(gfx.lightShader),
+    collisionShader: cloneShaderConfig(gfx.collisionShader),
+    reflectionShader: cloneShaderConfig(gfx.reflectionShader),
+  });
+}
+
+/** Deep-clone a scheme (e.g. before persisting a user theme). */
+export function cloneCyberScheme(scheme: CyberScheme): CyberScheme {
+  return {
+    id: scheme.id,
+    name: scheme.name,
+    tag: scheme.tag,
+    [TYPE_DAY]: { ...scheme[TYPE_DAY] },
+    [TYPE_NIGHT]: { ...scheme[TYPE_NIGHT] },
+    look: look(scheme.look),
+  };
 }
 
 /** Apply a theme's visual personality onto gfx options. */

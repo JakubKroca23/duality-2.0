@@ -13,9 +13,10 @@ import {
   defaultGfxOptions,
   type ShaderConfig,
 } from '../config/constants';
-import { CYBER_SCHEMES, cloneSchemeThemes, tileFromBall } from '../config/themes';
+import { cloneSchemeThemes, listAllSchemes, tileFromBall } from '../config/themes';
 import { applyCustomOrScheme, type SimState } from './state';
 import { markGridDirty } from './render';
+import { loadUserSchemes } from './userThemes';
 
 export const STORAGE_KEY = 'duality_sim_settings_v5';
 const LEGACY_STORAGE_KEY = 'duality_sim_settings_v4';
@@ -214,9 +215,11 @@ export function loadSettings(state: SimState): void {
     const gfx = data.gfx as Record<string, unknown> | undefined;
     if (gfx) applyGfx(state, gfx);
 
-    if (typeof data.themeIndex === 'number' && data.themeIndex >= 0 && data.themeIndex < CYBER_SCHEMES.length) {
+    const userSchemes = loadUserSchemes();
+    const schemeCount = listAllSchemes(userSchemes).length;
+    if (typeof data.themeIndex === 'number' && data.themeIndex >= 0 && data.themeIndex < schemeCount) {
       state.currentSchemeIndex = data.themeIndex;
-      state.themes = cloneSchemeThemes(state.currentSchemeIndex);
+      state.themes = cloneSchemeThemes(state.currentSchemeIndex, userSchemes);
     }
 
     if (typeof data.soundEnabled === 'boolean') state.soundEnabled = data.soundEnabled;

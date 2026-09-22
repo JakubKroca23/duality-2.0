@@ -313,6 +313,104 @@ export function updateShaderTrails(state: SimState, deltaSeconds: number): void 
   }
 }
 
+/** Soft screen glow on the black chrome; fades out toward the outer rim (do ztracena). */
+let frameGlowBuf: HTMLCanvasElement | null = null;
+let frameGlowFadeKey = '';
+let frameGlowFadeMask: ImageData | null = null;
+
+function getFrameGlowCtx(full: number): CanvasRenderingContext2D {
+  if (!frameGlowBuf) frameGlowBuf = document.createElement('canvas');
+  if (frameGlowBuf.width !== full || frameGlowBuf.height !== full) {
+    frameGlowBuf.width = full;
+    frameGlowBuf.height = full;
+    frameGlowFadeKey = '';
+    frameGlowFadeMask = null;
+  }
+  const ctx = frameGlowBuf.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('frame glow context unavailable');
+  return ctx;
+}
+
+/** Cached alpha mask: 1 at playfield edge → 0 at outer canvas edge. */
+function getFrameOuterFadeMask(W: number, F: number, full: number): ImageData {
+  const key = `${W}|${F}|${full}`;
+  if (frameGlowFadeMask && frameGlowFadeKey === key) return frameGlowFadeMask;
+
+  const mask = new ImageData(full, full);
+  const data = mask.data;
+  for (let py = 0; py < full; py++) {
+    for (let px = 0; px < full; px++) {
+      const x = px - F;
+      const y = py - F;
+      const inside = x >= 0 && y >= 0 && x < W && y < W;
+      const i = (py * full + px) * 4;
+      if (inside) {
+        data[i + 3] = 0;
+        continue;
+      }
+      let d = 0;
+      if (x < 0) d = Math.max(d, -x);
+      if (y < 0) d = Math.max(d, -y);
+      if (x > W) d = Math.max(d, x - W);
+      if (y > W) d = Math.max(d, y - W);
+      // Soft ease-out so rim light dissolves with the black frame
+      const u = Math.min(1, Math.max(0, d / Math.max(1, F)));
+      const fade = Math.pow(1 - u, 1.75);
+      data[i + 3] = Math.round(255 * fade);
+    }
+  }
+  frameGlowFadeKey = key;
+  frameGlowFadeMask = mask;
+  return mask;
+}
+
+function paintFrameGlowBlob(
+  ctx: CanvasRenderingContext2D,
+  originX: number,
+  originY: number,
+  radius: number,
+  intensity: number,
+  color: string,
+  F: number,
+  W: number,
+): void {
+  if (intensity < 0.02 || radius <= 0) return;
+  const glowR = radius + F * 1.85;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-F, -F, W + F * 2, W + F * 2);
+  ctx.rect(0, 0, W, W);
+  ctx.clip('evenodd');
+  ctx.globalCompositeOperation = 'screen';
+  const g = ctx.createRadialGradient(originX, originY, 0, originX, originY, glowR);
+  g.addColorStop(0, hexToRgba(color, Math.min(0.95, 0.82 * intensity)));
+  g.addColorStop(0.28, hexToRgba(color, 0.42 * intensity));
+  g.addColorStop(0.62, hexToRgba(color, 0.14 * intensity));
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(-F, -F, W + F * 2, W + F * 2);
+  ctx.restore();
+}
+
+function applyFrameOuterFade(octx: CanvasRenderingContext2D, W: number, F: number, full: number): void {
+  const glow = octx.getImageData(0, 0, full, full);
+  const mask = getFrameOuterFadeMask(W, F, full);
+  const gd = glow.data;
+  const md = mask.data;
+  const f = Math.ceil(F);
+  // Only the chrome ring carries glow — skip the playfield interior.
+  for (let py = 0; py < full; py++) {
+    const inVertBand = py < f || py >= full - f;
+    for (let px = 0; px < full; px++) {
+      if (!inVertBand && px >= f && px < full - f) continue;
+      const i = (py * full + px) * 4;
+      if (gd[i + 3] === 0) continue;
+      gd[i + 3] = Math.round((gd[i + 3] * md[i + 3]) / 255);
+    }
+  }
+  octx.putImageData(glow, 0, 0);
+}
+
 function drawFloorLight(state: SimState): void {
   const { balls, boardWidth, gfxOptions } = state;
   const cfg = gfxOptions.lightShader;
@@ -365,6 +463,7 @@ function drawCollisionShader(state: SimState): void {
     const t = Math.max(0, flash.life / flash.maxLife);
     const intensity = coll * Math.pow(t, 0.85);
     const radius = baseRadius * (0.55 + t * 0.55);
+    const color = shaderColorFor(state, 'collision', flash.type);
     paintTerritoryLight(
       state,
       flash.type,
@@ -373,172 +472,45 @@ function drawCollisionShader(state: SimState): void {
       radius,
       intensity,
       cfg.grid,
-      shaderColorFor(state, 'collision', flash.type),
+      color,
     );
   }
 }
 
 type ReflectionBounce = { x: number; y: number; strength: number; reach: number };
 
-function isFrontierCell(
-  grid: number[][],
-  r: number,
-  c: number,
-  type: 0 | 1,
-  gridSize: number,
-): boolean {
-  if (grid[r][c] !== type) return false;
-  if (c + 1 < gridSize && grid[r][c + 1] !== type) return true;
-  if (c > 0 && grid[r][c - 1] !== type) return true;
-  if (r + 1 < gridSize && grid[r + 1][c] !== type) return true;
-  if (r > 0 && grid[r - 1][c] !== type) return true;
-  return false;
-}
-
-function isArenaEdgeCell(r: number, c: number, gridSize: number): boolean {
-  return r === 0 || c === 0 || r === gridSize - 1 || c === gridSize - 1;
-}
-
-/** Frontier between colors, or own-type cell on the arena wall. */
-function isReflectionBoundaryCell(
-  grid: number[][],
-  r: number,
-  c: number,
-  type: 0 | 1,
-  gridSize: number,
-): boolean {
-  if (grid[r][c] !== type) return false;
-  return isFrontierCell(grid, r, c, type, gridSize) || isArenaEdgeCell(r, c, gridSize);
-}
-
 /**
- * Boundary samples near the ball: color frontiers + arena walls.
- * Glow stays on the edge band (no open-territory fill).
+ * Closest points on the four arena outer walls (inner edge of the black frame).
+ * Reflection never samples frontiers or open territory.
  */
 function collectReflectionBounces(
   state: SimState,
-  ball: { x: number; y: number; type: 0 | 1 },
+  ball: { x: number; y: number },
   falloff: number,
   refl: number,
 ): ReflectionBounce[] {
-  const { cellSize, physicsOptions, grid } = state;
-  const gridSize = physicsOptions.gridSize;
+  const W = state.boardWidth;
   const bounces: ReflectionBounce[] = [];
-  if (falloff <= 0 || cellSize <= 0) return bounces;
+  if (falloff <= 0 || W <= 0) return bounces;
 
-  const cellReach = Math.min(gridSize, Math.ceil(falloff / cellSize) + 1);
-  const centerCol = Math.floor(ball.x / cellSize);
-  const centerRow = Math.floor(ball.y / cellSize);
-  const minCol = Math.max(0, centerCol - cellReach);
-  const maxCol = Math.min(gridSize - 1, centerCol + cellReach);
-  const minRow = Math.max(0, centerRow - cellReach);
-  const maxRow = Math.min(gridSize - 1, centerRow + cellReach);
-  const minCellReach = Math.max(cellSize * 0.85, arenaFrac(state.boardWidth, 0.012));
+  const clampEdge = (v: number) => Math.max(0, Math.min(W, v));
+  const edges: { x: number; y: number; dist: number }[] = [
+    { x: 0, y: clampEdge(ball.y), dist: ball.x },
+    { x: W, y: clampEdge(ball.y), dist: W - ball.x },
+    { x: clampEdge(ball.x), y: 0, dist: ball.y },
+    { x: clampEdge(ball.x), y: W, dist: W - ball.y },
+  ];
+  const minReach = Math.max(state.framePad * 0.9, arenaFrac(W, 0.014));
 
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      if (!isReflectionBoundaryCell(grid, r, c, ball.type, gridSize)) continue;
-
-      const cx = c * cellSize + cellSize * 0.5;
-      const cy = r * cellSize + cellSize * 0.5;
-      const dist = Math.hypot(ball.x - cx, ball.y - cy);
-      if (dist > falloff) continue;
-
-      const near = Math.max(0, 1 - dist / falloff);
-      const strength = refl * Math.pow(near, 1.15);
-      if (strength <= 0.02) continue;
-
-      bounces.push({
-        x: cx,
-        y: cy,
-        strength,
-        reach: minCellReach,
-      });
-    }
+  for (const e of edges) {
+    if (e.dist > falloff) continue;
+    const near = Math.max(0, 1 - e.dist / falloff);
+    const strength = refl * Math.pow(near, 1.1);
+    if (strength <= 0.02) continue;
+    bounces.push({ x: e.x, y: e.y, strength, reach: minReach });
   }
 
   return bounces;
-}
-
-/** Glow only on frontier / arena-edge cells of ballType. */
-function paintFrontierLight(
-  state: SimState,
-  ballType: 0 | 1,
-  originX: number,
-  originY: number,
-  lightRadius: number,
-  intensity: number,
-  lightGrid: boolean,
-  color: string,
-): void {
-  if (intensity <= 0 || lightRadius <= 0) return;
-
-  const { ctx, cellSize, physicsOptions, grid } = state;
-  const gridSize = physicsOptions.gridSize;
-  const cellReach = Math.min(
-    gridSize,
-    Math.ceil(lightRadius / Math.max(cellSize, 1e-6)) + 1,
-  );
-
-  const centerCol = Math.floor(originX / cellSize);
-  const centerRow = Math.floor(originY / cellSize);
-  const minCol = Math.max(0, centerCol - cellReach);
-  const maxCol = Math.min(gridSize - 1, centerCol + cellReach);
-  const minRow = Math.max(0, centerRow - cellReach);
-  const maxRow = Math.min(gridSize - 1, centerRow + cellReach);
-
-  ctx.save();
-  ctx.beginPath();
-  let hasClip = false;
-
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      if (!isReflectionBoundaryCell(grid, r, c, ballType, gridSize)) continue;
-
-      const tileCenterX = c * cellSize + cellSize * 0.5;
-      const tileCenterY = r * cellSize + cellSize * 0.5;
-      const dist = Math.hypot(originX - tileCenterX, originY - tileCenterY);
-      if (dist >= lightRadius) continue;
-
-      if (lightGrid) {
-        const normDist = dist / lightRadius;
-        const smoothFactor = Math.cos(normDist * Math.PI * 0.5);
-        const specSheen = Math.pow(smoothFactor, 2.5) * intensity;
-
-        ctx.fillStyle = hexToRgba(color, specSheen * 0.42);
-        ctx.fillRect(c * cellSize + 0.5, r * cellSize + 0.5, cellSize - 1, cellSize - 1);
-
-        if (specSheen > 0.4 * intensity) {
-          ctx.fillStyle = hexToRgba('#ffffff', (specSheen - 0.4 * intensity) * 0.24);
-          ctx.fillRect(c * cellSize + 1, r * cellSize + 1, cellSize - 2, cellSize - 2);
-        }
-
-        ctx.strokeStyle = hexToRgba(color, smoothFactor * 0.75 * intensity);
-        ctx.lineWidth = Math.max(0.5, state.boardWidth * 0.0014);
-        ctx.strokeRect(c * cellSize + 0.5, r * cellSize + 0.5, cellSize - 1, cellSize - 1);
-      }
-
-      ctx.rect(c * cellSize, r * cellSize, cellSize, cellSize);
-      hasClip = true;
-    }
-  }
-
-  if (hasClip) {
-    ctx.clip();
-    ctx.globalCompositeOperation = 'screen';
-    const floorAura = ctx.createRadialGradient(originX, originY, 0, originX, originY, lightRadius);
-    floorAura.addColorStop(0, hexToRgba(color, 0.5 * intensity));
-    floorAura.addColorStop(0.45, hexToRgba(color, 0.2 * intensity));
-    floorAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = floorAura;
-    ctx.fillRect(
-      minCol * cellSize,
-      minRow * cellSize,
-      (maxCol - minCol + 1) * cellSize,
-      (maxRow - minRow + 1) * cellSize,
-    );
-  }
-  ctx.restore();
 }
 
 function reflectionGlowRadius(
@@ -547,17 +519,28 @@ function reflectionGlowRadius(
   intensity: number,
   surfaceReach: number | undefined,
 ): number {
-  // Keep the band tight along the frontier — not a wide flood into territory.
-  const base = shaderReachPx(boardWidth, reachSetting, 0.03, 0.14);
+  // Spread along the black frame only (clipped out of the playfield).
+  const base = shaderReachPx(boardWidth, reachSetting, 0.05, 0.26);
   const scaled = base * (0.55 + Math.min(1, intensity) * 0.55);
   return Math.max(scaled, surfaceReach ?? 0);
 }
 
-/** Frontier + arena-wall glow where the ball approaches an edge (+ fading trail). */
+/** Lights only the black chrome frame where the ball nears an outer wall. */
 function drawReflectionShader(state: SimState): void {
   const { balls, boardWidth, gfxOptions } = state;
   const cfg = gfxOptions.reflectionShader;
   if (!isShaderOn(cfg)) return;
+
+  const F = state.framePad;
+  const W = boardWidth;
+  if (F <= 0 || W <= 0) return;
+
+  const full = Math.max(1, Math.ceil(W + F * 2));
+  const octx = getFrameGlowCtx(full);
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.clearRect(0, 0, full, full);
+  octx.save();
+  octx.translate(F, F);
 
   const refl = cfg.strength / 100;
 
@@ -566,43 +549,43 @@ function drawReflectionShader(state: SimState): void {
     const intensity = echo.strength * Math.pow(t, 0.9);
     if (intensity < 0.015) continue;
     const radius = reflectionGlowRadius(boardWidth, cfg.reach, intensity, echo.reach);
-    paintFrontierLight(
-      state,
-      echo.type,
-      echo.x,
-      echo.y,
-      radius,
-      intensity,
-      cfg.grid,
-      shaderColorFor(state, 'reflection', echo.type),
-    );
+    const color = shaderColorFor(state, 'reflection', echo.type);
+    paintFrameGlowBlob(octx, echo.x, echo.y, radius, intensity, color, F, W);
   }
 
   const falloff = shaderReachPx(boardWidth, cfg.reach, 0.08, 0.42);
   balls.forEach((ball) => {
     const bounces = collectReflectionBounces(state, ball, falloff, refl);
+    const color = shaderColorFor(state, 'reflection', ball.type);
     for (const b of bounces) {
       const radius = reflectionGlowRadius(boardWidth, cfg.reach, b.strength, b.reach);
-      paintFrontierLight(
-        state,
-        ball.type,
-        b.x,
-        b.y,
-        radius,
-        b.strength,
-        cfg.grid,
-        shaderColorFor(state, 'reflection', ball.type),
-      );
+      paintFrameGlowBlob(octx, b.x, b.y, radius, b.strength, color, F, W);
     }
   });
+
+  octx.restore();
+  applyFrameOuterFade(octx, W, F, full);
+
+  const { ctx } = state;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.drawImage(frameGlowBuf!, -F, -F);
+  ctx.restore();
 }
 export function draw(state: SimState): void {
   const { ctx, boardWidth, cellSize, gfxOptions, themes, balls, particles, physicsOptions } =
     state;
   const gridSize = physicsOptions.gridSize;
+  const framePad = state.framePad;
+  const full = boardWidth + framePad * 2;
   if (boardWidth <= 0 || cellSize <= 0 || gridSize <= 0) return;
 
-  ctx.clearRect(0, 0, boardWidth, boardWidth);
+  ctx.clearRect(0, 0, full, full);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, full, full);
+
+  ctx.save();
+  ctx.translate(framePad, framePad);
 
   if (state.gridDirty || !state.gridBitmap || state.gridBitmap.width !== gridSize) {
     rebuildGridBitmap(state);
@@ -732,25 +715,42 @@ export function draw(state: SimState): void {
 
     ctx.restore();
   });
+
+  ctx.restore();
 }
 
-export function updateScoreboard(state: SimState): void {
+function scoreRoot(root?: ParentNode | null): ParentNode {
+  return root ?? document;
+}
+
+function scoreNode(root: ParentNode, role: string, id: string): HTMLElement | null {
+  return (
+    (root.querySelector(`[data-role="${role}"]`) as HTMLElement | null) ??
+    (root === document ? document.getElementById(id) : null)
+  );
+}
+
+export function updateScoreboard(state: SimState, root?: ParentNode | null): void {
+  const scope = scoreRoot(root);
   const gridSize = state.physicsOptions.gridSize;
+  if (!state.grid?.length || gridSize <= 0) return;
   let dayCount = 0;
   for (let r = 0; r < gridSize; r++) {
+    const row = state.grid[r];
+    if (!row) continue;
     for (let c = 0; c < gridSize; c++) {
-      if (state.grid[r][c] === 0) dayCount++;
+      if (row[c] === 0) dayCount++;
     }
   }
   const total = Math.max(1, gridSize * gridSize);
   const nightCount = total - dayCount;
 
-  const scoreDay = document.getElementById('scoreDay');
-  const scoreNight = document.getElementById('scoreNight');
-  const pctDay = document.getElementById('pctDay');
-  const pctNight = document.getElementById('pctNight');
-  const barDay = document.getElementById('barDay');
-  const barNight = document.getElementById('barNight');
+  const scoreDay = scoreNode(scope, 'score-day', 'scoreDay');
+  const scoreNight = scoreNode(scope, 'score-night', 'scoreNight');
+  const pctDay = scoreNode(scope, 'pct-day', 'pctDay');
+  const pctNight = scoreNode(scope, 'pct-night', 'pctNight');
+  const barDay = scoreNode(scope, 'bar-day', 'barDay');
+  const barNight = scoreNode(scope, 'bar-night', 'barNight');
   if (!scoreDay || !scoreNight || !pctDay || !pctNight || !barDay || !barNight) return;
 
   scoreDay.textContent = String(dayCount);
@@ -763,4 +763,53 @@ export function updateScoreboard(state: SimState): void {
   pctNight.textContent = `(${nightPct}%)`;
   barDay.style.width = `${dayPct}%`;
   barNight.style.width = `${nightPct}%`;
+
+  const runTimeEl = scoreNode(scope, 'stat-run-time', 'statRunTime');
+  const leadDayEl = scoreNode(scope, 'stat-lead-day', 'statLeadDay');
+  const leadNightEl = scoreNode(scope, 'stat-lead-night', 'statLeadNight');
+  if (runTimeEl) runTimeEl.textContent = formatRunTime(state.runTimeSec);
+
+  const denom = Math.max(state.runTimeSec, 1e-6);
+  const leadDayPct = (state.leadTimeDay / denom) * 100;
+  const leadNightPct = (state.leadTimeNight / denom) * 100;
+  if (leadDayEl) leadDayEl.textContent = `▲ ${formatLeadPct(leadDayPct)}`;
+  if (leadNightEl) leadNightEl.textContent = `▲ ${formatLeadPct(leadNightPct)}`;
+}
+
+function formatRunTime(sec: number): string {
+  const total = Math.max(0, Math.floor(sec));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatLeadPct(pct: number): string {
+  if (pct >= 9.95) return `${pct.toFixed(0)}%`;
+  return `${pct.toFixed(1)}%`;
+}
+
+/** Accumulate run/lead timers for the current frame (call only while running). */
+export function tickRunStats(state: SimState, deltaSeconds: number): void {
+  if (deltaSeconds <= 0) return;
+  state.runTimeSec += deltaSeconds;
+
+  const gridSize = state.physicsOptions.gridSize;
+  if (gridSize <= 0 || !state.grid.length) return;
+
+  let dayCount = 0;
+  const total = gridSize * gridSize;
+  for (let r = 0; r < gridSize; r++) {
+    const row = state.grid[r];
+    if (!row) continue;
+    for (let c = 0; c < gridSize; c++) {
+      if (row[c] === 0) dayCount++;
+    }
+  }
+  const nightCount = total - dayCount;
+  if (dayCount > nightCount) state.leadTimeDay += deltaSeconds;
+  else if (nightCount > dayCount) state.leadTimeNight += deltaSeconds;
 }

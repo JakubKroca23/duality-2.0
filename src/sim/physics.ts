@@ -84,7 +84,7 @@ export function resizeCanvas(state: SimState): void {
 
   const oldWidth = state.boardWidth;
   const dpr = window.devicePixelRatio || 1;
-  const framePad = Math.max(8, Math.min(18, Math.round(size * 0.022)));
+  const framePad = Math.max(12, Math.min(28, Math.round(size * 0.03)));
   const board = Math.max(32, size - framePad * 2);
 
   canvas.width = size * dpr;
@@ -166,6 +166,10 @@ export function resetSimulation(state: SimState, onAfter?: () => void): void {
   }
 
   applyBallRadii(state);
+
+  state.runTimeSec = 0;
+  state.leadTimeDay = 0;
+  state.leadTimeNight = 0;
 
   onAfter?.();
 }

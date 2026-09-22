@@ -45,7 +45,7 @@ export type SimState = {
   soundEnabled: boolean;
   cellSize: number;
   boardWidth: number;
-  /** Black chrome around the playable board (CSS px); shaders may light it. */
+  /** Black chrome around the playable board (CSS px); reflection shader lights it. */
   framePad: number;
   gfxOptions: GfxOptions;
   physicsOptions: PhysicsOptions;
@@ -54,6 +54,12 @@ export type SimState = {
   customColors: boolean;
   customDay: string;
   customNight: string;
+  /** Elapsed simulation time while running (seconds). */
+  runTimeSec: number;
+  /** Seconds side A (day) held territory majority. */
+  leadTimeDay: number;
+  /** Seconds side B (night) held territory majority. */
+  leadTimeNight: number;
   /** 1px-per-cell cache for large grids */
   gridBitmap: HTMLCanvasElement | null;
   gridDirty: boolean;
@@ -86,6 +92,9 @@ export function createInitialState(canvas: HTMLCanvasElement): SimState {
     customColors: false,
     customDay: themes[TYPE_DAY].ballColor,
     customNight: themes[TYPE_NIGHT].ballColor,
+    runTimeSec: 0,
+    leadTimeDay: 0,
+    leadTimeNight: 0,
     gridBitmap: null,
     gridDirty: true,
   };
