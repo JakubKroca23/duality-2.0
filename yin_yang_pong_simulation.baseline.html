@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duality: Yin Yang Pong</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --sim-size: min(calc(100vw - 1.5rem), calc(100dvh - 88px), 840px);
+      --neon-cyan: #00f0ff;
+      --neon-pink: #ff0055;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #030308;
+      background-image: 
+        radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 80% 85%, rgba(255, 0, 85, 0.06) 0%, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: #f3f4f6;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .sim-wrapper {
+      width: var(--sim-size);
+      max-width: 100%;
+    }
+    .canvas-container {
+      aspect-ratio: 1 / 1;
+      width: var(--sim-size);
+      height: var(--sim-size);
+      max-width: 100%;
+      max-height: var(--sim-size);
+      box-shadow: 
+        0 25px 60px -15px rgba(0, 0, 0, 0.95), 
+        0 0 35px -5px rgba(0, 240, 255, 0.15),
+        inset 0 0 2px 1px rgba(255, 255, 255, 0.1);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 1.25rem;
+    }
+    .scanlines-overlay {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      border-radius: 1.25rem;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.55) 50%);
+      background-size: 100% 4px;
+      opacity: 0.65;
+      transition: opacity 0.25s ease;
+    }
+    .vignette-overlay {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      border-radius: 1.25rem;
+      box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.92);
+    }
+    .glass-panel {
+      background: rgba(8, 10, 20, 0.94);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      box-shadow: 
+        0 14px 40px 0 rgba(0, 0, 0, 0.88),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: all 0.15s ease-out;
+    }
+    .glass-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(0, 240, 255, 0.3);
+    }
+    .drawer-expanded {
+      max-height: 260px !important;
+      opacity: 1 !important;
+      margin-bottom: 0.5rem !important;
+      pointer-events: auto !important;
+      overflow: visible !important;
+    }
+    .theme-item {
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .theme-item:hover {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: rgba(0, 240, 255, 0.4);
+    }
+    .theme-item.active {
+      border-color: rgba(0, 240, 255, 0.75);
+      background: rgba(0, 240, 255, 0.18);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+    }
+    .theme-item.active::after {
+      content: '●';
+      font-size: 8px;
+      color: #00f0ff;
+      text-shadow: 0 0 6px #00f0ff;
+    }
+    .nav-btn-active-emerald {
+      background: rgba(16, 185, 129, 0.22) !important;
+      border-color: rgba(16, 185, 129, 0.75) !important;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35) !important;
+      color: #34d399 !important;
+    }
+    .nav-btn-active-cyan {
+      background: rgba(0, 240, 255, 0.22) !important;
+      border-color: rgba(0, 240, 255, 0.75) !important;
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.35) !important;
+      color: #00f0ff !important;
+    }
+  </style>
+</head>
+
+<body class="flex flex-col items-center justify-start sm:justify-center p-2 sm:p-3 select-none min-h-screen">
+  
+  <div class="sim-wrapper flex flex-col items-center my-auto">
+    
+    <!-- TOP CONTROL BAR -->
+    <div class="w-full mb-1.5 flex items-center justify-between gap-1.5 sm:gap-2 glass-panel p-1.5 sm:p-2 rounded-2xl relative z-30">
+      
+      <!-- Left: Compact Action Buttons -->
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <!-- Play / Pause -->
+        <button id="btnPlayPause" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-cyan-500/15 hover:border-cyan-500/40 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Pozastavit / Spustit">
+          <svg id="iconPause" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <svg id="iconPlay" class="w-4 h-4 hidden text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </button>
+
+        <!-- Reset -->
+        <button id="btnReset" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Resetovat">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </button>
+
+        <!-- Sound Toggle -->
+        <button id="btnSound" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/[0.04] hover:bg-white/10 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition shadow-sm" title="Zvuk">
+          <svg id="iconSoundOn" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+          <svg id="iconSoundOff" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+        </button>
+      </div>
+
+      <!-- Center: Compact Territory Score & Proportion Bar -->
+      <div class="flex-1 max-w-[150px] sm:max-w-xs px-1 sm:px-2 flex flex-col justify-center">
+        <div class="flex justify-between items-center text-[11px] sm:text-xs font-semibold mono mb-0.5">
+          <div class="flex items-center gap-1 sm:gap-1.5" id="labelLeft">
+            <span id="dotLeft" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
+            <span id="scoreDay" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+            <span id="pctDay" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+          </div>
+          <div class="flex items-center gap-1 sm:gap-1.5" id="labelRight">
+            <span id="pctNight" class="text-[9px] opacity-75 font-normal hidden sm:inline">(50%)</span>
+            <span id="scoreNight" class="font-extrabold tracking-tight text-[11px] sm:text-xs">200</span>
+            <span id="dotRight" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]"></span>
+          </div>
+        </div>
+        <div class="w-full h-1 bg-black/80 rounded-full overflow-hidden flex border border-white/10 shadow-[inset_0_0_4px_rgba(0,0,0,0.8)]">
+          <div id="barDay" class="h-full transition-all duration-150" style="width: 50%;"></div>
+          <div id="barNight" class="h-full transition-all duration-150" style="width: 50%;"></div>
+        </div>
+      </div>
+
+      <!-- Right: Symmetrical Drawer Buttons for FYZIKA and GRAFIKA -->
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        
+        <!-- FYZIKA Drawer Toggle -->
+        <button id="btnTogglePhysics" class="h-8 sm:h-9 px-2 sm:px-2.5 flex items-center gap-1 bg-white/[0.04] hover:bg-emerald-500/15 hover:border-emerald-500/40 active:scale-95 text-slate-300 rounded-xl border border-white/10 transition text-[11px] font-bold tracking-wider mono uppercase shrink-0" title="Nastavení fyziky">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          <span class="hidden xs:inline">FYZIKA</span>
+        </button>
+
+        <!-- GRAFIKA Drawer Toggle -->
+        <button id="btnToggleGraphics" class="h-8 sm:h-9 px-2 sm:px-2.5 flex items-center gap-1.5 bg-white/[0.04] hover:bg-cyan-500/15 hover:border-cyan-500/40 active:scale-95 text-slate-200 rounded-xl border border-white/10 transition text-[11px] font-bold tracking-wider mono uppercase shrink-0" title="Nastavení grafiky a témat">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4 4 4 0 014-4c.7 0 1.36.17 1.94.47A7 7 0 1115.53 5.4 7.002 7.002 0 0121 12a7 7 0 01-7 7h-1a2 2 0 00-2 2v0a2 2 0 01-2 2H7z"></path></svg>
+          <span class="hidden xs:inline">GRAFIKA</span>
+        </button>
+
+      </div>
+
+    </div>
+
+    <!-- SLIDE-DOWN DRAWER CONTAINER (Both Physics and Graphics) -->
+    <div id="settingsDrawer" class="w-full max-h-0 opacity-0 overflow-hidden pointer-events-none transition-all duration-250 ease-out z-20 relative">
+      
+      <!-- 1. FYZIKA CONTENT -->
+      <div id="drawerPhysicsContent" class="hidden glass-panel p-2.5 rounded-2xl border border-emerald-500/25 mb-1 shadow-[0_10px_30px_rgba(0,0,0,0.85)]">
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-1 mb-2 border-b border-white/10">
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]"></span>
+            <span class="font-extrabold text-[10px] sm:text-[11px] tracking-wider mono uppercase text-emerald-400">FYZIKÁLNÍ PARAMETRY</span>
+          </div>
+          <button class="btnCloseDrawer p-1 text-slate-400 hover:text-emerald-400 rounded-lg transition active:scale-95" title="Zavřít">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <!-- Fyzikální karty (Rychlost a Počet bodů na tým) -->
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Rychlost -->
+          <div class="glass-card p-2 rounded-xl">
+            <div class="flex justify-between items-center text-[10px] mono font-bold text-emerald-400 mb-1">
+              <span>Rychlost</span>
+              <span id="lblSpeedVal" class="text-white">8.0 m/s</span>
+            </div>
+            <input id="sliderSpeedPhysics" type="range" min="0.5" max="30" step="0.5" value="8" class="w-full accent-emerald-400 cursor-pointer h-1 bg-black/60">
+          </div>
+
+          <!-- Počet bodů na tým -->
+          <div class="glass-card p-2 rounded-xl">
+            <div class="flex justify-between items-center text-[10px] mono font-bold text-emerald-400 mb-1">
+              <span>Počet bodů</span>
+              <span id="lblBallsVal" class="text-white">1 na tým</span>
+            </div>
+            <input id="sliderBallsCount" type="range" min="1" max="6" step="1" value="1" class="w-full accent-emerald-400 cursor-pointer h-1 bg-black/60">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. GRAFIKA CONTENT -->
+      <div id="drawerGraphicsContent" class="hidden glass-panel p-2.5 rounded-2xl border border-cyan-500/25 mb-1 shadow-[0_10px_30px_rgba(0,0,0,0.85)]">
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-1 mb-2 border-b border-white/10">
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff]"></span>
+            <span class="font-extrabold text-[10px] sm:text-[11px] tracking-wider mono uppercase text-cyan-400">GRAFIKA & TÉMA</span>
+          </div>
+          <button class="btnCloseDrawer p-1 text-slate-400 hover:text-cyan-400 rounded-lg transition active:scale-95" title="Zavřít">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <!-- 4 Grafické karty -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          
+          <!-- Karta 1: TÉMA (Pouze aktuální téma + rozklikávací výběr) -->
+          <div class="glass-card p-2 rounded-xl relative" id="themeSelectorContainer">
+            <div class="flex justify-between items-center text-[10px] mono font-bold text-cyan-400 mb-1">
+              <span>TÉMA</span>
+              <span class="text-[9px] text-slate-400">vybrat</span>
+            </div>
+
+            <!-- Tlačítko se zobrazením pouze aktuálního tématu -->
+            <button id="btnCurrentThemeTrigger" class="w-full h-7 px-2 flex items-center justify-between bg-black/50 hover:bg-cyan-500/15 rounded-lg border border-white/10 hover:border-cyan-500/40 text-[10px] mono transition shadow-inner">
+              <div class="flex items-center gap-1.5 truncate">
+                <div class="flex items-center -space-x-1 shrink-0">
+                  <span id="themeBtnDotDay" class="w-2.5 h-2.5 rounded-full"></span>
+                  <span id="themeBtnDotNight" class="w-2.5 h-2.5 rounded-full"></span>
+                </div>
+                <span id="themeBtnName" class="font-bold text-slate-100 tracking-wider truncate">NIGHT CITY</span>
+              </div>
+              <svg id="themePickerChevron" class="w-3 h-3 text-cyan-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+
+            <!-- Dropdown s výběrem ostatních témat otevřený až po kliku -->
+            <div id="themeDropdownMenu" class="hidden absolute top-full left-0 right-0 mt-1 glass-panel p-1 rounded-xl border border-cyan-500/35 shadow-[0_15px_30px_rgba(0,0,0,0.95)] z-50 space-y-1">
+              <div id="themeListContainer" class="space-y-1">
+                <!-- Generováno JavaScriptem -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Karta 2: Záře (Glow) -->
+          <div class="glass-card p-2 rounded-xl">
+            <div class="flex justify-between items-center text-[10px] mono font-bold text-cyan-400 mb-1">
+              <span>Záře</span>
+              <span id="lblGlowVal" class="text-white">20</span>
+            </div>
+            <input id="sliderGlow" type="range" min="0" max="36" step="2" value="20" class="w-full accent-cyan-400 cursor-pointer h-1 bg-black/60">
+          </div>
+
+          <!-- Karta 3: Stopa (Trail) -->
+          <div class="glass-card p-2 rounded-xl">
+            <div class="flex justify-between items-center text-[10px] mono font-bold text-cyan-400 mb-1">
+              <span>Stopa</span>
+              <div class="flex items-center gap-1.5">
+                <label class="flex items-center gap-1 cursor-pointer text-[9px] text-slate-300 font-normal hover:text-cyan-400 select-none">
+                  <input type="checkbox" id="chkTrailSolid" checked class="accent-cyan-400 cursor-pointer w-3 h-3">
+                  <span>Vcelku</span>
+                </label>
+                <span id="lblTrailVal" class="text-white ml-0.5">16</span>
+              </div>
+            </div>
+            <input id="sliderTrail" type="range" min="0" max="30" step="2" value="16" class="w-full accent-cyan-400 cursor-pointer h-1 bg-black/60">
+          </div>
+
+          <!-- Karta 4: CRT Filtr & Mřížka -->
+          <div class="glass-card p-2 rounded-xl flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[10px] mono font-bold text-cyan-400">
+              <span>CRT Filtr</span>
+              <input type="checkbox" id="chkScanlines" checked class="accent-cyan-400 cursor-pointer w-3.5 h-3.5">
+            </div>
+            <div class="flex items-center justify-between text-[10px] mono font-bold text-cyan-400 mt-1">
+              <span>Mřížka</span>
+              <input id="sliderGrid" type="range" min="0" max="35" step="5" value="15" class="w-16 accent-cyan-400 cursor-pointer h-1 bg-black/60">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ARENA CANVAS -->
+    <div class="canvas-container relative rounded-2xl p-1 bg-gradient-to-b from-cyan-500/10 via-white/[0.02] to-black/80 border border-cyan-500/20 backdrop-blur">
+      <canvas id="simCanvas"></canvas>
+      <div id="shaderScanlines" class="scanlines-overlay"></div>
+      <div class="vignette-overlay"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const GRID_SIZE = 20;
+    const ARENA_WIDTH_METERS = 10;
+    const TYPE_DAY = 0;   // Side A
+    const TYPE_NIGHT = 1; // Side B
+
+    const gfxOptions = {
+      glowIntensity: 20,
+      maxTrail: 16,
+      trailSolid: true,
+      particleCount: 10,
+      gridOpacity: 0.15,
+      scanlines: true
+    };
+
+    const physicsOptions = {
+      speedMps: 8.0,
+      ballsPerSide: 1
+    };
+
+    const CYBER_SCHEMES = [
+      {
+        id: 'night-city',
+        name: 'NIGHT CITY',
+        tag: 'CYAN / PINK',
+        [TYPE_DAY]: { tileColor: '#041724', ballColor: '#00f0ff', note: 'E4' },
+        [TYPE_NIGHT]: { tileColor: '#200516', ballColor: '#ff0055', note: 'B3' }
+      },
+      {
+        id: 'matrix',
+        name: 'MATRIX',
+        tag: 'ACID / AMBER',
+        [TYPE_DAY]: { tileColor: '#02180c', ballColor: '#00ff66', note: 'F#4' },
+        [TYPE_NIGHT]: { tileColor: '#241701', ballColor: '#ffb700', note: 'C#4' }
+      },
+      {
+        id: 'synthwave',
+        name: 'SYNTHWAVE',
+        tag: 'VIOLET / SUN',
+        [TYPE_DAY]: { tileColor: '#170529', ballColor: '#bf00ff', note: 'A4' },
+        [TYPE_NIGHT]: { tileColor: '#290e03', ballColor: '#ff5e00', note: 'D4' }
+      },
+      {
+        id: 'crimson',
+        name: 'CRIMSON',
+        tag: 'WHITE / RED',
+        [TYPE_DAY]: { tileColor: '#101622', ballColor: '#e2f3ff', note: 'G4' },
+        [TYPE_NIGHT]: { tileColor: '#26050a', ballColor: '#ff1744', note: 'C4' }
+      },
+      {
+        id: 'hypervolt',
+        name: 'VOLT',
+        tag: 'VOLT / BLUE',
+        [TYPE_DAY]: { tileColor: '#172202', ballColor: '#d4ff00', note: 'B4' },
+        [TYPE_NIGHT]: { tileColor: '#041029', ballColor: '#2979ff', note: 'E3' }
+      }
+    ];
+
+    let currentSchemeIndex = 0;
+    let THEMES = {
+      [TYPE_DAY]: { ...CYBER_SCHEMES[0][TYPE_DAY] },
+      [TYPE_NIGHT]: { ...CYBER_SCHEMES[0][TYPE_NIGHT] }
+    };
+
+    const STORAGE_KEY = 'duality_sim_settings';
+
+    function saveSettings() {
+      try {
+        const payload = {
+          physics: {
+            speedMps: physicsOptions.speedMps,
+            ballsPerSide: physicsOptions.ballsPerSide
+          },
+          gfx: {
+            glowIntensity: gfxOptions.glowIntensity,
+            maxTrail: gfxOptions.maxTrail,
+            trailSolid: gfxOptions.trailSolid,
+            gridOpacity: gfxOptions.gridOpacity,
+            scanlines: gfxOptions.scanlines
+          },
+          themeIndex: currentSchemeIndex,
+          soundEnabled: soundEnabled
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {}
+    }
+
+    function loadSettings() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        const data = JSON.parse(saved);
+        if (data.physics) {
+          if (typeof data.physics.speedMps === 'number' && !isNaN(data.physics.speedMps)) {
+            physicsOptions.speedMps = Math.max(0.5, Math.min(30, data.physics.speedMps));
+          }
+          if (typeof data.physics.ballsPerSide === 'number' && !isNaN(data.physics.ballsPerSide)) {
+            physicsOptions.ballsPerSide = Math.max(1, Math.min(6, data.physics.ballsPerSide));
+          }
+        }
+        if (data.gfx) {
+          if (typeof data.gfx.glowIntensity === 'number') {
+            gfxOptions.glowIntensity = Math.max(0, Math.min(36, data.gfx.glowIntensity));
+          }
+          if (typeof data.gfx.maxTrail === 'number') {
+            gfxOptions.maxTrail = Math.max(0, Math.min(30, data.gfx.maxTrail));
+          }
+          if (typeof data.gfx.trailSolid === 'boolean') {
+            gfxOptions.trailSolid = data.gfx.trailSolid;
+          }
+          if (typeof data.gfx.gridOpacity === 'number') {
+            gfxOptions.gridOpacity = Math.max(0, Math.min(0.35, data.gfx.gridOpacity));
+          }
+          if (typeof data.gfx.scanlines === 'boolean') {
+            gfxOptions.scanlines = data.gfx.scanlines;
+          }
+        }
+        if (typeof data.themeIndex === 'number' && data.themeIndex >= 0 && data.themeIndex < CYBER_SCHEMES.length) {
+          currentSchemeIndex = data.themeIndex;
+          THEMES[TYPE_DAY] = { ...CYBER_SCHEMES[currentSchemeIndex][TYPE_DAY] };
+          THEMES[TYPE_NIGHT] = { ...CYBER_SCHEMES[currentSchemeIndex][TYPE_NIGHT] };
+        }
+        if (typeof data.soundEnabled === 'boolean') {
+          soundEnabled = data.soundEnabled;
+        }
+      } catch (e) {}
+    }
+
+    loadSettings();
+
+    let canvas = document.getElementById('simCanvas');
+    let ctx = canvas.getContext('2d');
+    let grid = [];
+    let isRunning = true;
+    let soundEnabled = false;
+    let particles = [];
+    let synth = null;
+
+    class Ball {
+      constructor(type, x, y) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.radius = 0;
+        this.history = [];
+        
+        let angle = Math.random() * Math.PI * 2;
+        while (Math.abs(Math.sin(angle)) < 0.25 || Math.abs(Math.cos(angle)) < 0.25) {
+          angle = Math.random() * Math.PI * 2;
+        }
+        this.vx = Math.cos(angle);
+        this.vy = Math.sin(angle);
+      }
+
+      setDirection(dx, dy) {
+        const len = Math.hypot(dx, dy) || 1;
+        this.vx = dx / len;
+        this.vy = dy / len;
+      }
+    }
+
+    let balls = [];
+
+    function initAudio() {
+      if (!synth && window.Tone) {
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.005, decay: 0.08, sustain: 0, release: 0.08 }
+        }).toDestination();
+        synth.volume.value = -12;
+      }
+    }
+
+    function playBounceSound(type) {
+      if (!soundEnabled || !synth) return;
+      try {
+        Tone.start();
+        const note = type === TYPE_DAY ? THEMES[TYPE_DAY].note : THEMES[TYPE_NIGHT].note;
+        synth.triggerAttackRelease(note, '32n');
+      } catch (e) {}
+    }
+
+    let cellSize = 0;
+    let boardWidth = 0;
+
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      const size = Math.floor(container.clientWidth);
+      if (size <= 0) return;
+
+      const oldWidth = boardWidth;
+      const dpr = window.devicePixelRatio || 1;
+      
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      boardWidth = size;
+      cellSize = boardWidth / GRID_SIZE;
+
+      if (oldWidth > 0 && oldWidth !== boardWidth) {
+        const scale = boardWidth / oldWidth;
+        balls.forEach(ball => {
+          ball.x *= scale;
+          ball.y *= scale;
+          ball.history.forEach(p => {
+            p.x *= scale;
+            p.y *= scale;
+          });
+        });
+        particles.forEach(p => {
+          p.x *= scale;
+          p.y *= scale;
+        });
+      }
+
+      balls.forEach(ball => {
+        ball.radius = Math.max(2.5, cellSize * 0.11);
+      });
+    }
+
+    function resetSimulation() {
+      grid = [];
+      for (let r = 0; r < GRID_SIZE; r++) {
+        let row = [];
+        for (let c = 0; c < GRID_SIZE; c++) {
+          row.push(c < GRID_SIZE / 2 ? TYPE_DAY : TYPE_NIGHT);
+        }
+        grid.push(row);
+      }
+
+      particles = [];
+
+      const leftCenterX = (GRID_SIZE / 4) * cellSize + cellSize / 2;
+      const rightCenterX = ((3 * GRID_SIZE) / 4) * cellSize + cellSize / 2;
+      const centerY = (GRID_SIZE / 2) * cellSize;
+
+      balls = [];
+      const count = physicsOptions.ballsPerSide;
+      for (let i = 0; i < count; i++) {
+        const offset = count > 1 ? ((i / (count - 1)) - 0.5) * (GRID_SIZE * cellSize * 0.45) : 0;
+        balls.push(new Ball(TYPE_DAY, leftCenterX, centerY + offset));
+        balls.push(new Ball(TYPE_NIGHT, rightCenterX, centerY - offset));
+      }
+
+      balls.forEach(b => {
+        b.radius = Math.max(2.5, cellSize * 0.11);
+      });
+
+      syncColorsUI();
+      updateScoreboard();
+    }
+
+    function spawnParticles(x, y, color) {
+      if (gfxOptions.particleCount <= 0) return;
+      for (let i = 0; i < gfxOptions.particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 3.2 + 1.2;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: Math.random() * 2.8 + 1.5,
+          life: 1.0,
+          color
+        });
+      }
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.045;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function hexToRgba(hex, alpha) {
+      let c = hex.replace('#', '');
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      const num = parseInt(c, 16);
+      const r = (num >> 16) & 255;
+      const g = (num >> 8) & 255;
+      const b = num & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function updateBallPhysics(ball, deltaSeconds) {
+      const pxPerMeter = boardWidth / ARENA_WIDTH_METERS;
+      const totalDistPx = physicsOptions.speedMps * pxPerMeter * deltaSeconds;
+
+      const maxStepSize = cellSize * 0.16;
+      const steps = Math.max(4, Math.ceil(totalDistPx / maxStepSize));
+      const stepDist = totalDistPx / steps;
+
+      for (let step = 0; step < steps; step++) {
+        ball.x += ball.vx * stepDist;
+        ball.y += ball.vy * stepDist;
+
+        if (ball.x - ball.radius <= 0) {
+          ball.x = ball.radius;
+          ball.vx = Math.abs(ball.vx);
+          playBounceSound(ball.type);
+        } else if (ball.x + ball.radius >= boardWidth) {
+          ball.x = boardWidth - ball.radius;
+          ball.vx = -Math.abs(ball.vx);
+          playBounceSound(ball.type);
+        }
+
+        if (ball.y - ball.radius <= 0) {
+          ball.y = ball.radius;
+          ball.vy = Math.abs(ball.vy);
+          playBounceSound(ball.type);
+        } else if (ball.y + ball.radius >= boardWidth) {
+          ball.y = boardWidth - ball.radius;
+          ball.vy = -Math.abs(ball.vy);
+          playBounceSound(ball.type);
+        }
+
+        const centerCol = Math.floor(ball.x / cellSize);
+        const centerRow = Math.floor(ball.y / cellSize);
+        let collided = false;
+
+        for (let r = Math.max(0, centerRow - 1); r <= Math.min(GRID_SIZE - 1, centerRow + 1); r++) {
+          for (let c = Math.max(0, centerCol - 1); c <= Math.min(GRID_SIZE - 1, centerCol + 1); c++) {
+            if (grid[r][c] !== ball.type) {
+              const tileLeft = c * cellSize;
+              const tileTop = r * cellSize;
+              const tileRight = tileLeft + cellSize;
+              const tileBottom = tileTop + cellSize;
+
+              const closestX = Math.max(tileLeft, Math.min(ball.x, tileRight));
+              const closestY = Math.max(tileTop, Math.min(ball.y, tileBottom));
+
+              const distX = ball.x - closestX;
+              const distY = ball.y - closestY;
+              const distSq = distX * distX + distY * distY;
+
+              if (distSq < ball.radius * ball.radius) {
+                grid[r][c] = ball.type;
+                collided = true;
+                
+                spawnParticles(closestX, closestY, THEMES[ball.type].ballColor);
+                playBounceSound(ball.type);
+
+                if (Math.abs(distX) > Math.abs(distY)) {
+                  ball.vx = distX > 0 ? Math.abs(ball.vx) : -Math.abs(ball.vx);
+                  ball.x = closestX + (distX > 0 ? ball.radius : -ball.radius);
+                } else {
+                  ball.vy = distY > 0 ? Math.abs(ball.vy) : -Math.abs(ball.vy);
+                  ball.y = closestY + (distY > 0 ? ball.radius : -ball.radius);
+                }
+
+                ball.setDirection(ball.vx, ball.vy);
+                break;
+              }
+            }
+          }
+          if (collided) break;
+        }
+      }
+
+      if (gfxOptions.maxTrail > 0) {
+        ball.history.push({ x: ball.x, y: ball.y });
+        while (ball.history.length > gfxOptions.maxTrail) {
+          ball.history.shift();
+        }
+      } else {
+        ball.history = [];
+      }
+    }
+
+    function updateScoreboard() {
+      let dayCount = 0;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (grid[r][c] === TYPE_DAY) dayCount++;
+        }
+      }
+      const total = GRID_SIZE * GRID_SIZE;
+      const nightCount = total - dayCount;
+
+      document.getElementById('scoreDay').textContent = dayCount;
+      document.getElementById('scoreNight').textContent = nightCount;
+
+      const dayPct = ((dayCount / total) * 100).toFixed(1);
+      const nightPct = ((nightCount / total) * 100).toFixed(1);
+
+      document.getElementById('pctDay').textContent = `(${dayPct}%)`;
+      document.getElementById('pctNight').textContent = `(${nightPct}%)`;
+
+      document.getElementById('barDay').style.width = dayPct + '%';
+      document.getElementById('barNight').style.width = nightPct + '%';
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, boardWidth, boardWidth);
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const type = grid[r][c];
+          const x = c * cellSize;
+          const y = r * cellSize;
+
+          ctx.fillStyle = THEMES[type].tileColor;
+          ctx.fillRect(x, y, cellSize, cellSize);
+
+          if (gfxOptions.gridOpacity > 0) {
+            ctx.strokeStyle = hexToRgba(THEMES[type].ballColor, gfxOptions.gridOpacity);
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x, y, cellSize, cellSize);
+          }
+        }
+      }
+
+      balls.forEach(ball => {
+        const theme = THEMES[ball.type];
+        const lightRadius = cellSize * 3.2;
+        const minCol = Math.max(0, Math.floor((ball.x - lightRadius) / cellSize));
+        const maxCol = Math.min(GRID_SIZE - 1, Math.floor((ball.x + lightRadius) / cellSize));
+        const minRow = Math.max(0, Math.floor((ball.y - lightRadius) / cellSize));
+        const maxRow = Math.min(GRID_SIZE - 1, Math.floor((ball.y + lightRadius) / cellSize));
+
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            const tileCenterX = c * cellSize + cellSize * 0.5;
+            const tileCenterY = r * cellSize + cellSize * 0.5;
+            const dist = Math.hypot(ball.x - tileCenterX, ball.y - tileCenterY);
+
+            if (dist < lightRadius) {
+              const normDist = dist / lightRadius;
+              const smoothFactor = Math.cos(normDist * Math.PI * 0.5);
+              const specSheen = Math.pow(smoothFactor, 2.5);
+
+              // 1. Zrcadlící se světelná patina na ploše čtverce
+              ctx.fillStyle = hexToRgba(theme.ballColor, specSheen * 0.38);
+              ctx.fillRect(c * cellSize + 0.5, r * cellSize + 0.5, cellSize - 1, cellSize - 1);
+
+              // 2. Bílý odlesk nejbližších čtverců
+              if (specSheen > 0.45) {
+                ctx.fillStyle = hexToRgba('#ffffff', (specSheen - 0.45) * 0.22);
+                ctx.fillRect(c * cellSize + 1, r * cellSize + 1, cellSize - 2, cellSize - 2);
+              }
+
+              // 3. Světelný odraz na hranách mřížky pod bodem
+              ctx.strokeStyle = hexToRgba(theme.ballColor, smoothFactor * 0.65);
+              ctx.lineWidth = 1;
+              ctx.strokeRect(c * cellSize + 0.5, r * cellSize + 0.5, cellSize - 1, cellSize - 1);
+            }
+          }
+        }
+
+        // 4. Měkký radiální halo bloom přes celou oblast
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const floorAura = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, lightRadius);
+        floorAura.addColorStop(0, hexToRgba(theme.ballColor, 0.45));
+        floorAura.addColorStop(0.4, hexToRgba(theme.ballColor, 0.18));
+        floorAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = floorAura;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, lightRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8 * p.life;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
+      });
+
+      balls.forEach(ball => {
+        const theme = THEMES[ball.type];
+        ctx.save();
+
+        if (gfxOptions.glowIntensity > 0) {
+          const auraRadius = cellSize * (0.65 + gfxOptions.glowIntensity * 0.045);
+          const auraGrad = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, auraRadius);
+          auraGrad.addColorStop(0, hexToRgba(theme.ballColor, 0.9));
+          auraGrad.addColorStop(0.35, hexToRgba(theme.ballColor, 0.28));
+          auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, auraRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        if (gfxOptions.maxTrail > 0 && ball.history.length > 0) {
+          if (gfxOptions.trailSolid && ball.history.length > 1) {
+            // Vcelku: souvislý světelný paprsek
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            for (let i = 0; i < ball.history.length - 1; i++) {
+              const p1 = ball.history[i];
+              const p2 = ball.history[i + 1];
+              const factor = (i + 1) / ball.history.length;
+              ctx.beginPath();
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.strokeStyle = hexToRgba(theme.ballColor, factor * 0.65);
+              ctx.lineWidth = Math.max(1.5, ball.radius * factor * 1.5);
+              if (gfxOptions.glowIntensity > 0) {
+                ctx.shadowColor = theme.ballColor;
+                ctx.shadowBlur = (gfxOptions.glowIntensity * 0.4) * factor;
+              }
+              ctx.stroke();
+            }
+            const lastPos = ball.history[ball.history.length - 1];
+            ctx.beginPath();
+            ctx.moveTo(lastPos.x, lastPos.y);
+            ctx.lineTo(ball.x, ball.y);
+            ctx.strokeStyle = hexToRgba(theme.ballColor, 0.75);
+            ctx.lineWidth = Math.max(1.5, ball.radius * 1.5);
+            if (gfxOptions.glowIntensity > 0) {
+              ctx.shadowColor = theme.ballColor;
+              ctx.shadowBlur = gfxOptions.glowIntensity * 0.4;
+            }
+            ctx.stroke();
+            ctx.restore();
+          } else {
+            // Dělená stopa: jednotlivé zářící body
+            for (let i = 0; i < ball.history.length; i++) {
+              const pos = ball.history[i];
+              const factor = (i + 1) / ball.history.length;
+              const trailR = Math.max(1.5, ball.radius * factor * 0.85);
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, trailR, 0, Math.PI * 2);
+              ctx.fillStyle = hexToRgba(theme.ballColor, factor * 0.6);
+              if (gfxOptions.glowIntensity > 0) {
+                ctx.shadowColor = theme.ballColor;
+                ctx.shadowBlur = (gfxOptions.glowIntensity * 0.5) * factor;
+              }
+              ctx.fill();
+            }
+          }
+        }
+
+        if (gfxOptions.glowIntensity > 0) {
+          ctx.shadowColor = theme.ballColor;
+          ctx.shadowBlur = gfxOptions.glowIntensity;
+        }
+        ctx.fillStyle = theme.ballColor;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = Math.min(10, gfxOptions.glowIntensity * 0.5);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, Math.max(1.5, ball.radius * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      });
+    }
+
+    let lastTime = 0;
+    let lastScoreUpdate = 0;
+
+    function gameLoop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const deltaSeconds = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      if (isRunning) {
+        balls.forEach(b => updateBallPhysics(b, deltaSeconds));
+        updateParticles();
+
+        if (timestamp - lastScoreUpdate > 100) {
+          updateScoreboard();
+          lastScoreUpdate = timestamp;
+        }
+      }
+
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function syncColorsUI() {
+      const currentScheme = CYBER_SCHEMES[currentSchemeIndex];
+      const leftCol = THEMES[TYPE_DAY].ballColor;
+      const rightCol = THEMES[TYPE_NIGHT].ballColor;
+
+      // Update drawer theme button representation
+      document.getElementById('themeBtnName').textContent = currentScheme.name;
+      
+      const themeBtnDotDay = document.getElementById('themeBtnDotDay');
+      themeBtnDotDay.style.backgroundColor = leftCol;
+      themeBtnDotDay.style.boxShadow = `0 0 6px ${leftCol}`;
+
+      const themeBtnDotNight = document.getElementById('themeBtnDotNight');
+      themeBtnDotNight.style.backgroundColor = rightCol;
+      themeBtnDotNight.style.boxShadow = `0 0 6px ${rightCol}`;
+
+      // Scoreboard indicators
+      document.getElementById('labelLeft').style.color = leftCol;
+      document.getElementById('labelRight').style.color = rightCol;
+      
+      const dotL = document.getElementById('dotLeft');
+      dotL.style.backgroundColor = leftCol;
+      dotL.style.boxShadow = `0 0 10px ${leftCol}`;
+
+      const dotR = document.getElementById('dotRight');
+      dotR.style.backgroundColor = rightCol;
+      dotR.style.boxShadow = `0 0 10px ${rightCol}`;
+
+      const barDay = document.getElementById('barDay');
+      barDay.style.backgroundColor = leftCol;
+      barDay.style.boxShadow = `0 0 8px ${leftCol}`;
+
+      const barNight = document.getElementById('barNight');
+      barNight.style.backgroundColor = rightCol;
+      barNight.style.boxShadow = `0 0 8px ${rightCol}`;
+    }
+
+    function renderThemeDropdownList() {
+      const container = document.getElementById('themeListContainer');
+      container.innerHTML = '';
+
+      CYBER_SCHEMES.forEach((scheme, index) => {
+        const item = document.createElement('div');
+        const isActive = index === currentSchemeIndex;
+        item.className = `theme-item glass-card p-1.5 rounded-lg flex items-center justify-between border ${isActive ? 'active' : ''}`;
+        
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <div class="flex items-center -space-x-1">
+              <span class="w-2 h-2 rounded-full" style="background-color: ${scheme[TYPE_DAY].ballColor}; box-shadow: 0 0 5px ${scheme[TYPE_DAY].ballColor};"></span>
+              <span class="w-2 h-2 rounded-full" style="background-color: ${scheme[TYPE_NIGHT].ballColor}; box-shadow: 0 0 5px ${scheme[TYPE_NIGHT].ballColor};"></span>
+            </div>
+            <div>
+              <span class="font-bold text-[9px] text-slate-100 mono block tracking-wider leading-tight">${scheme.name}</span>
+              <span class="text-[7.5px] text-slate-400 mono opacity-80">${scheme.tag}</span>
+            </div>
+          </div>
+        `;
+
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectTheme(index);
+          closeThemeDropdown();
+        });
+
+        container.appendChild(item);
+      });
+    }
+
+    function selectTheme(index) {
+      currentSchemeIndex = index;
+      const scheme = CYBER_SCHEMES[index];
+      THEMES[TYPE_DAY] = { ...scheme[TYPE_DAY] };
+      THEMES[TYPE_NIGHT] = { ...scheme[TYPE_NIGHT] };
+      syncColorsUI();
+      renderThemeDropdownList();
+      saveSettings();
+    }
+
+    // Unified Drawer State Management
+    const settingsDrawer = document.getElementById('settingsDrawer');
+    const drawerPhysicsContent = document.getElementById('drawerPhysicsContent');
+    const drawerGraphicsContent = document.getElementById('drawerGraphicsContent');
+    const btnTogglePhysics = document.getElementById('btnTogglePhysics');
+    const btnToggleGraphics = document.getElementById('btnToggleGraphics');
+
+    let currentDrawerMode = 'none'; // 'none' | 'physics' | 'graphics'
+
+    function openDrawer(mode) {
+      if (currentDrawerMode === mode) {
+        closeDrawer();
+        return;
+      }
+
+      currentDrawerMode = mode;
+      closeThemeDropdown();
+
+      if (mode === 'physics') {
+        drawerPhysicsContent.classList.remove('hidden');
+        drawerGraphicsContent.classList.add('hidden');
+        btnTogglePhysics.classList.add('nav-btn-active-emerald');
+        btnToggleGraphics.classList.remove('nav-btn-active-cyan');
+      } else if (mode === 'graphics') {
+        drawerGraphicsContent.classList.remove('hidden');
+        drawerPhysicsContent.classList.add('hidden');
+        btnToggleGraphics.classList.add('nav-btn-active-cyan');
+        btnTogglePhysics.classList.remove('nav-btn-active-emerald');
+      }
+
+      settingsDrawer.classList.add('drawer-expanded');
+    }
+
+    function closeDrawer() {
+      currentDrawerMode = 'none';
+      settingsDrawer.classList.remove('drawer-expanded');
+      btnTogglePhysics.classList.remove('nav-btn-active-emerald');
+      btnToggleGraphics.classList.remove('nav-btn-active-cyan');
+      closeThemeDropdown();
+      setTimeout(() => {
+        if (currentDrawerMode === 'none') {
+          drawerPhysicsContent.classList.add('hidden');
+          drawerGraphicsContent.classList.add('hidden');
+        }
+      }, 250);
+    }
+
+    btnTogglePhysics.addEventListener('click', () => openDrawer('physics'));
+    btnToggleGraphics.addEventListener('click', () => openDrawer('graphics'));
+
+    document.querySelectorAll('.btnCloseDrawer').forEach(btn => {
+      btn.addEventListener('click', closeDrawer);
+    });
+
+    // Theme selector click dropdown within the graphics drawer
+    const btnCurrentThemeTrigger = document.getElementById('btnCurrentThemeTrigger');
+    const themeDropdownMenu = document.getElementById('themeDropdownMenu');
+    const themePickerChevron = document.getElementById('themePickerChevron');
+    const themeSelectorContainer = document.getElementById('themeSelectorContainer');
+
+    function toggleThemeDropdown() {
+      const isHidden = themeDropdownMenu.classList.contains('hidden');
+      if (isHidden) {
+        themeDropdownMenu.classList.remove('hidden');
+        themePickerChevron.classList.add('rotate-180');
+      } else {
+        closeThemeDropdown();
+      }
+    }
+
+    function closeThemeDropdown() {
+      themeDropdownMenu.classList.add('hidden');
+      themePickerChevron.classList.remove('rotate-180');
+    }
+
+    btnCurrentThemeTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleThemeDropdown();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!themeSelectorContainer.contains(e.target)) {
+        closeThemeDropdown();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeThemeDropdown();
+        if (currentDrawerMode !== 'none') {
+          closeDrawer();
+        }
+      }
+    });
+
+    // Simulation Controls
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const iconPlay = document.getElementById('iconPlay');
+    const iconPause = document.getElementById('iconPause');
+
+    btnPlayPause.addEventListener('click', () => {
+      isRunning = !isRunning;
+      if (isRunning) {
+        iconPause.classList.remove('hidden');
+        iconPlay.classList.add('hidden');
+      } else {
+        iconPause.classList.add('hidden');
+        iconPlay.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      resetSimulation();
+    });
+
+    const btnSound = document.getElementById('btnSound');
+    const iconSoundOn = document.getElementById('iconSoundOn');
+    const iconSoundOff = document.getElementById('iconSoundOff');
+
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) {
+        initAudio();
+        iconSoundOn.classList.remove('hidden');
+        iconSoundOff.classList.add('hidden');
+      } else {
+        iconSoundOn.classList.add('hidden');
+        iconSoundOff.classList.remove('hidden');
+      }
+      saveSettings();
+    });
+
+    // Physics Inputs
+    const sliderSpeedPhysics = document.getElementById('sliderSpeedPhysics');
+    const lblSpeedVal = document.getElementById('lblSpeedVal');
+    sliderSpeedPhysics.addEventListener('input', (e) => {
+      physicsOptions.speedMps = parseFloat(e.target.value);
+      lblSpeedVal.textContent = `${physicsOptions.speedMps.toFixed(1)} m/s`;
+      saveSettings();
+    });
+
+    const sliderBallsCount = document.getElementById('sliderBallsCount');
+    const lblBallsVal = document.getElementById('lblBallsVal');
+    sliderBallsCount.addEventListener('input', (e) => {
+      physicsOptions.ballsPerSide = parseInt(e.target.value);
+      lblBallsVal.textContent = `${physicsOptions.ballsPerSide} na tým`;
+      resetSimulation();
+      saveSettings();
+    });
+
+    // Graphics Inputs
+    const sliderGlow = document.getElementById('sliderGlow');
+    const lblGlowVal = document.getElementById('lblGlowVal');
+    sliderGlow.addEventListener('input', (e) => {
+      gfxOptions.glowIntensity = parseInt(e.target.value);
+      lblGlowVal.textContent = gfxOptions.glowIntensity;
+      saveSettings();
+    });
+
+    const sliderTrail = document.getElementById('sliderTrail');
+    const lblTrailVal = document.getElementById('lblTrailVal');
+    sliderTrail.addEventListener('input', (e) => {
+      gfxOptions.maxTrail = parseInt(e.target.value);
+      lblTrailVal.textContent = gfxOptions.maxTrail;
+      saveSettings();
+    });
+
+    const chkTrailSolid = document.getElementById('chkTrailSolid');
+    chkTrailSolid.addEventListener('change', (e) => {
+      gfxOptions.trailSolid = e.target.checked;
+      saveSettings();
+    });
+
+    const chkScanlines = document.getElementById('chkScanlines');
+    const shaderScanlines = document.getElementById('shaderScanlines');
+    chkScanlines.addEventListener('change', (e) => {
+      gfxOptions.scanlines = e.target.checked;
+      shaderScanlines.style.opacity = gfxOptions.scanlines ? '0.65' : '0';
+      saveSettings();
+    });
+
+    const sliderGrid = document.getElementById('sliderGrid');
+    sliderGrid.addEventListener('input', (e) => {
+      gfxOptions.gridOpacity = parseInt(e.target.value) / 100;
+      saveSettings();
+    });
+
+    function applySettingsToInputs() {
+      if (soundEnabled) {
+        iconSoundOn.classList.remove('hidden');
+        iconSoundOff.classList.add('hidden');
+      } else {
+        iconSoundOn.classList.add('hidden');
+        iconSoundOff.classList.remove('hidden');
+      }
+
+      sliderSpeedPhysics.value = physicsOptions.speedMps;
+      lblSpeedVal.textContent = `${physicsOptions.speedMps.toFixed(1)} m/s`;
+
+      sliderBallsCount.value = physicsOptions.ballsPerSide;
+      lblBallsVal.textContent = `${physicsOptions.ballsPerSide} na tým`;
+
+      sliderGlow.value = gfxOptions.glowIntensity;
+      lblGlowVal.textContent = gfxOptions.glowIntensity;
+
+      sliderTrail.value = gfxOptions.maxTrail;
+      lblTrailVal.textContent = gfxOptions.maxTrail;
+
+      chkTrailSolid.checked = gfxOptions.trailSolid;
+
+      chkScanlines.checked = gfxOptions.scanlines;
+      shaderScanlines.style.opacity = gfxOptions.scanlines ? '0.65' : '0';
+
+      sliderGrid.value = Math.round(gfxOptions.gridOpacity * 100);
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    window.onload = function () {
+      resizeCanvas();
+      applySettingsToInputs();
+      renderThemeDropdownList();
+      resetSimulation();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "duality-2.0",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "npm run dev -w @duality/api",
+    "dev:db": "docker compose up db -d",
+    "build": "tsc && vite build",
+    "build:api": "npm run build -w @duality/api",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
