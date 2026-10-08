@@ -45,6 +45,13 @@ body {
   transform-origin: center center;
 }
 
+/* Fullscreen CSS blur kills mobile GPUs — drop bleed there. */
+@media (hover: none) and (pointer: coarse), (max-width: 820px) {
+  .page-bleed {
+    display: none !important;
+  }
+}
+
 .mono {
   font-family: 'JetBrains Mono', monospace;
 }

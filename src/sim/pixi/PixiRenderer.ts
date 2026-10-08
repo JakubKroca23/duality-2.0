@@ -7,6 +7,7 @@ import {
   Texture,
 } from 'pixi.js';
 import { isShaderOn } from '../../config/constants';
+import { getPerfProfile } from '../perf';
 import type { SimState } from '../state';
 import { shaderColorFor } from '../render';
 import { FrameReflectionFilter, MAX_BOUNCES } from './filters/frameReflection';
@@ -109,6 +110,9 @@ export class PixiRenderer {
   private bounceRad = new Float32Array(MAX_BOUNCES);
 
   private lastFull = 0;
+  private frontierCacheKey = '';
+  private gridCacheKey = '';
+  private renderDpr = 1;
 
   async init(host: HTMLElement): Promise<void> {
     if (this.app && this.host === host) return;
@@ -128,16 +132,20 @@ export class PixiRenderer {
     // Build filters first — if UniformGroup throws, we must not leave orphan canvases.
     const lightFilter = new TerritoryLightFilter();
     const reflectionFilter = new FrameReflectionFilter();
+    const perf = getPerfProfile();
+    lightFilter.resolution = perf.filterResolution;
+    reflectionFilter.resolution = perf.filterResolution;
 
     const size = Math.max(32, Math.floor(host.clientWidth) || 320);
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = perf.dpr;
+    this.renderDpr = dpr;
 
     const app = new Application();
     await app.init({
       width: size,
       height: size,
       backgroundColor: 0x000000,
-      antialias: true,
+      antialias: perf.antialias,
       resolution: dpr,
       autoDensity: true,
       autoStart: false,
@@ -197,7 +205,7 @@ export class PixiRenderer {
 
   resize(fullCssPx: number, framePad: number): void {
     if (!this.app || !this.boardRoot) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = this.renderDpr || getPerfProfile().dpr;
     const full = Math.max(32, Math.floor(fullCssPx));
     if (full !== this.lastFull) {
       this.app.renderer.resize(full, full, dpr);
@@ -246,6 +254,9 @@ export class PixiRenderer {
     this.gridSize = 0;
     this.lastFull = 0;
     this.lastLookKey = '';
+    this.frontierCacheKey = '';
+    this.gridCacheKey = '';
+    this.renderDpr = 1;
   }
 
   render(state: SimState): void {
@@ -257,9 +268,10 @@ export class PixiRenderer {
     const full = boardWidth + framePad * 2;
     this.resize(full, framePad);
 
+    const territoryDirty = state.gridDirty;
     this.syncTerritory(state);
-    this.drawFrontier(state);
-    this.drawCellGrid(state);
+    this.drawFrontier(state, territoryDirty);
+    this.drawCellGrid(state, territoryDirty);
     this.updateLightFilter(state);
     this.updateReflectionFilter(state);
     this.drawBallsAndParticles(state);
@@ -354,16 +366,27 @@ export class PixiRenderer {
     state.gridDirty = false;
   }
 
-  private drawFrontier(state: SimState): void {
+  private drawFrontier(state: SimState, territoryDirty: boolean): void {
     const gfx = this.frontierGfx;
     if (!gfx) return;
-    gfx.clear();
 
     const strength = state.gfxOptions.frontierStrength / 100;
+    const { cellSize, physicsOptions, boardWidth } = state;
+    const gridSize = physicsOptions.gridSize;
+    const cacheKey = [
+      gridSize,
+      cellSize.toFixed(2),
+      boardWidth.toFixed(1),
+      state.gfxOptions.frontierStrength,
+      state.gfxOptions.frontierColor,
+    ].join('|');
+
+    if (!territoryDirty && cacheKey === this.frontierCacheKey) return;
+    this.frontierCacheKey = cacheKey;
+    gfx.clear();
     if (strength <= 0) return;
 
-    const { cellSize, physicsOptions, grid, boardWidth } = state;
-    const gridSize = physicsOptions.gridSize;
+    const grid = state.grid;
     const [cr, cg, cb] = parseHex(state.gfxOptions.frontierColor);
     const alpha = Math.min(1, strength * 0.95);
     const lw = Math.max(1, Math.min(4, boardWidth * 0.006));
@@ -391,15 +414,26 @@ export class PixiRenderer {
     gfx.stroke();
   }
 
-  private drawCellGrid(state: SimState): void {
+  private drawCellGrid(state: SimState, territoryDirty: boolean): void {
     const gfx = this.gridGfx;
     if (!gfx) return;
-    gfx.clear();
 
-    const { gfxOptions, physicsOptions, cellSize, themes, grid } = state;
+    const { gfxOptions, physicsOptions, cellSize, themes } = state;
     const gridSize = physicsOptions.gridSize;
+    const cacheKey = [
+      gridSize,
+      cellSize.toFixed(2),
+      gfxOptions.gridOpacity,
+      themes[0].ballColor,
+      themes[1].ballColor,
+    ].join('|');
+
+    if (!territoryDirty && cacheKey === this.gridCacheKey) return;
+    this.gridCacheKey = cacheKey;
+    gfx.clear();
     if (gfxOptions.gridOpacity <= 0 || gridSize > 128) return;
 
+    const grid = state.grid;
     const lw = 0.5;
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
@@ -422,7 +456,8 @@ export class PixiRenderer {
     radius: number,
     side: number,
   ): number {
-    if (count >= MAX_LIGHTS || intensity < 0.02 || radius <= 0) return count;
+    const lightCap = Math.min(MAX_LIGHTS, getPerfProfile().maxLights);
+    if (count >= lightCap || intensity < 0.02 || radius <= 0) return count;
     const i = count;
     this.lightPos[i * 2] = x;
     this.lightPos[i * 2 + 1] = y;
@@ -586,29 +621,35 @@ export class PixiRenderer {
       const [br, bg, bb] = parseHex(theme.ballColor);
       const ballColor = (br << 16) | (bg << 8) | bb;
 
+      const mobileLite = getPerfProfile().filterResolution < 1;
+
       if (gfxOptions.glowIntensity > 0) {
         const auraRadius = arenaFrac(
           boardWidth,
           0.032 + (gfxOptions.glowIntensity / 36) * 0.08,
         );
-        gfx.circle(ball.x, ball.y, auraRadius);
-        gfx.fill({ color: ballColor, alpha: 0.22 });
-        gfx.circle(ball.x, ball.y, auraRadius * 0.45);
-        gfx.fill({ color: ballColor, alpha: 0.35 });
+        gfx.circle(ball.x, ball.y, auraRadius * (mobileLite ? 0.7 : 1));
+        gfx.fill({ color: ballColor, alpha: mobileLite ? 0.28 : 0.22 });
+        if (!mobileLite) {
+          gfx.circle(ball.x, ball.y, auraRadius * 0.45);
+          gfx.fill({ color: ballColor, alpha: 0.35 });
+        }
       }
 
       if (gfxOptions.maxTrail > 0 && ball.history.length > 0) {
-        if (gfxOptions.trailSolid && ball.history.length > 1) {
-          for (let i = 0; i < ball.history.length - 1; i++) {
-            const p1 = ball.history[i];
-            const p2 = ball.history[i + 1];
-            const factor = (i + 1) / ball.history.length;
+        const hist = ball.history;
+        const step = mobileLite && hist.length > 4 ? 2 : 1;
+        if (gfxOptions.trailSolid && hist.length > 1) {
+          for (let i = 0; i < hist.length - 1; i += step) {
+            const p1 = hist[i];
+            const p2 = hist[Math.min(i + step, hist.length - 1)];
+            const factor = (i + 1) / hist.length;
             const lw = Math.max(boardWidth * 0.0015, ball.radius * factor * 1.5);
             gfx.moveTo(p1.x, p1.y);
             gfx.lineTo(p2.x, p2.y);
             gfx.stroke({ width: lw, color: ballColor, alpha: factor * 0.65 });
           }
-          const last = ball.history[ball.history.length - 1];
+          const last = hist[hist.length - 1];
           gfx.moveTo(last.x, last.y);
           gfx.lineTo(ball.x, ball.y);
           gfx.stroke({
@@ -617,9 +658,9 @@ export class PixiRenderer {
             alpha: 0.75,
           });
         } else {
-          for (let i = 0; i < ball.history.length; i++) {
-            const pos = ball.history[i];
-            const factor = (i + 1) / ball.history.length;
+          for (let i = 0; i < hist.length; i += step) {
+            const pos = hist[i];
+            const factor = (i + 1) / hist.length;
             const trailR = Math.max(boardWidth * 0.001, ball.radius * factor * 0.85);
             gfx.circle(pos.x, pos.y, trailR);
             gfx.fill({ color: ballColor, alpha: factor * 0.6 });

@@ -1,3 +1,4 @@
+import { getPerfProfile } from './perf';
 import type { SimState } from './state';
 
 const GLOW_FADE_MS = 2000;
@@ -127,10 +128,18 @@ function advanceGlow(now: number): void {
  * White when both sides are tied. Color crossfades ~1s when lead changes.
  */
 export function updatePageBleed(state: SimState, force = false, now = performance.now()): boolean {
+  const perf = getPerfProfile();
+  if (!perf.pageBleed) {
+    const existing = document.getElementById('pageBleed');
+    if (existing) existing.style.display = 'none';
+    return false;
+  }
+
   const canvas = ensureBleedCanvas();
+  canvas.style.display = '';
   const vw = Math.max(1, window.innerWidth);
   const vh = Math.max(1, window.innerHeight);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = perf.bleedDpr;
 
   const stage = arenaBleedRect(state.canvas);
   const n = state.physicsOptions.gridSize;

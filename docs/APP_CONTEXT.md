@@ -1,6 +1,6 @@
 # Chaos 2.0 — dlouhodobý kontext (agent memory)
 
-> Aktualizováno: 2026-10-08  
+> Aktualizováno: 2026-10-08 (mobile perf)  
 > Repo: `/home/jakub/github/duality-2.0` (npm: `chaos-2.0`)  
 > Produkce: https://chaos.propoj.app  
 > Jazyk UI: čeština; kód/komentáře: angličtina.  
@@ -87,7 +87,14 @@ Fyzika webu: `src/sim/physics.ts`. Headless: `packages/sim/src/engine.ts`.
 7. Particles + míčky (glow / trail / body) — Graphics
 
 `src/sim/render.ts`: jen `updateShaderTrails`, scoreboard, `markGridDirty`, helpers.  
-Page bleed (`ambient.ts`): Canvas 2D fullscreen mimo arénu.
+Page bleed (`ambient.ts`): Canvas 2D fullscreen mimo arénu — **na mobilu vypnuto** (CSS `blur(64px)` + fullscreen 2D = stutter).
+
+### Mobile perf (`src/sim/perf.ts`)
+
+- Cap DPR (~1.25), `antialias: false`, filter resolution 0.5
+- Max ~10 lights / 16 light echoes; frontier + cell grid cache dokud `gridDirty`
+- Minimized sessiony jen fyzika (bez Pixi render)
+- Pause loop když `document.hidden`
 
 ---
 
@@ -157,6 +164,7 @@ Game loop: physics → particles → flashes → shader trails → stats → **P
 | Trails / scoreboard | `src/sim/render.ts` |
 | **Pixi renderer** | `src/sim/pixi/PixiRenderer.ts`, `sessionPixi.ts`, `filters/*` |
 | Ambient bleed | `src/sim/ambient.ts` |
+| Mobile perf profile | `src/sim/perf.ts` |
 | Controls | `src/ui/controls.ts` |
 | Sessions | `src/ui/sessions.ts` |
 | Headless | `packages/sim/src/engine.ts` |

@@ -8,6 +8,7 @@ import {
   tickSessionMeta,
 } from './ui/sessions';
 import { invalidatePageBleed, updatePageBleed } from './sim/ambient';
+import { getPerfProfile, invalidatePerfProfile } from './sim/perf';
 import { updateBallPhysics, updateParticles, updateCollisionFlashes, resizeCanvas, resetSimulation } from './sim/physics';
 import { tickRunStats, updateScoreboard, updateShaderTrails } from './sim/render';
 import { destroyPixi, ensurePixi, getPixi, isPixiFailed, isPixiPending } from './sim/pixi/sessionPixi';
@@ -45,12 +46,19 @@ function arenaHost(sessionRoot: HTMLElement, probe: HTMLCanvasElement): HTMLElem
 }
 
 function gameLoop(timestamp: number): void {
+  if (document.hidden) {
+    lastTime = timestamp;
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
   if (!lastTime) lastTime = timestamp;
   const deltaSeconds = Math.min((timestamp - lastTime) / 1000, 0.1);
   lastTime = timestamp;
 
   const sessions = getSessions();
   let activeGridDirty = false;
+  const perf = getPerfProfile();
 
   for (const session of sessions) {
     const s = session.state;
@@ -66,6 +74,9 @@ function gameLoop(timestamp: number): void {
       updateScoreboard(s, session.root);
     }
 
+    // Background cards keep sim running, but skip WebGL — biggest multi-arena win.
+    if (session.minimized) continue;
+
     const gridWasDirty = s.gridDirty;
     const host = arenaHost(session.root, s.canvas);
     if (host) {
@@ -78,7 +89,7 @@ function gameLoop(timestamp: number): void {
         });
       }
     }
-    if (!session.minimized && gridWasDirty) activeGridDirty = true;
+    if (gridWasDirty) activeGridDirty = true;
   }
 
   if (timestamp - lastScoreUpdate > 100) {
@@ -87,13 +98,14 @@ function gameLoop(timestamp: number): void {
   }
 
   const bleedState = getBleedState();
-  if (bleedState) {
-    const bleedAnimating = updatePageBleed(
-      bleedState,
-      activeGridDirty || bleedNeedsRefresh,
-      timestamp,
-    );
-    if (bleedAnimating || activeGridDirty || bleedNeedsRefresh || timestamp - lastBleedUpdate > 250) {
+  if (bleedState && perf.pageBleed) {
+    const due =
+      activeGridDirty ||
+      bleedNeedsRefresh ||
+      perf.bleedIntervalMs <= 0 ||
+      timestamp - lastBleedUpdate >= perf.bleedIntervalMs;
+    if (due) {
+      updatePageBleed(bleedState, activeGridDirty || bleedNeedsRefresh, timestamp);
       lastBleedUpdate = timestamp;
     }
   }
@@ -116,6 +128,7 @@ if (bootSession) {
 }
 
 window.addEventListener('resize', () => {
+  invalidatePerfProfile();
   invalidatePageBleed();
   resizeAllSessions();
   bleedNeedsRefresh = true;

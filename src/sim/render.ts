@@ -1,4 +1,5 @@
 import { isShaderOn, type Side } from '../config/constants';
+import { getPerfProfile } from './perf';
 import type { SimState } from './state';
 
 export function hexToRgba(hex: string, alpha: number): string {
@@ -97,7 +98,6 @@ function collectReflectionBounces(
   return bounces;
 }
 
-const LIGHT_ECHO_CAP = 72;
 const REFLECTION_ECHO_CAP = 96;
 
 /** Deposit fading shader trails; FadeMs = how long afterimages linger. */
@@ -135,7 +135,8 @@ export function updateShaderTrails(state: SimState, deltaSeconds: number): void 
         maxLife,
         strength: light,
       });
-      while (state.lightEchoes.length > LIGHT_ECHO_CAP) state.lightEchoes.shift();
+      const echoCap = getPerfProfile().lightEchoCap;
+      while (state.lightEchoes.length > echoCap) state.lightEchoes.shift();
     }
   }
 
