@@ -1,0 +1,31 @@
+# Chaos 2.0 — produkce za Appwrite Traefik
+# Doména: chaos.propoj.app (HTTPS / letsencrypt)
+#
+#   cp .env.example .env
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# DNS A/AAAA chaos.propoj.app → IP serveru
+# Síť `personal` musí existovat (Traefik stack)
+
+services:
+  db:
+    ports: !reset []
+
+  web:
+    ports: !reset []
+    networks:
+      - default
+      - personal
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=personal
+      - traefik.http.services.chaos.loadbalancer.server.port=80
+      - traefik.http.routers.chaos.rule=Host(`chaos.propoj.app`)
+      - traefik.http.routers.chaos.entrypoints=websecure
+      - traefik.http.routers.chaos.tls=true
+      - traefik.http.routers.chaos.tls.certresolver=letsencrypt
+
+networks:
+  personal:
+    external: true
+    name: personal

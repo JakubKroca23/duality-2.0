@@ -1,5 +1,5 @@
 {
-  "name": "duality-2.0",
+  "name": "chaos-2.0",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -16,6 +16,7 @@
     "build:api": "npm run build -w @duality/api",
     "preview": "vite preview",
     "docker:up": "docker compose up --build -d",
+    "docker:up:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f web api"
   },

@@ -70,7 +70,7 @@ function collectReflectionBounces(
 }
 
 /**
- * PixiJS WebGL arena renderer — sole visual backend for Duality.
+ * PixiJS WebGL arena renderer — sole visual backend for Chaos 2.0.
  * Reads SimState / GfxOptions (including all three shaders) each frame.
  */
 export class PixiRenderer {

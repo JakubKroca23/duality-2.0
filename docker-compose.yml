@@ -1,41 +1,50 @@
+# Chaos 2.0 — lokální / základní stack
+# Produkce (Traefik + chaos.propoj.app): viz docker-compose.prod.yml
+
+name: chaos
+
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: duality
-      POSTGRES_PASSWORD: duality
-      POSTGRES_DB: duality
+      POSTGRES_USER: ${POSTGRES_USER:-chaos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chaos}
+      POSTGRES_DB: ${POSTGRES_DB:-chaos}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - duality_pg:/var/lib/postgresql/data
+      - chaos_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U duality -d duality"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 3s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: postgres://duality:duality@db:5432/duality
+      DATABASE_URL: postgres://${POSTGRES_USER:-chaos}:${POSTGRES_PASSWORD:-chaos}@db:5432/${POSTGRES_DB:-chaos}
       PORT: "8787"
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://chaos.propoj.app,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173}
     depends_on:
       db:
         condition: service_healthy
     expose:
       - "8787"
+    restart: unless-stopped
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    ports:
-      - "8080:80"
     depends_on:
       - api
+    ports:
+      - "${CHAOS_PORT:-8080}:80"
+    restart: unless-stopped
 
 volumes:
-  duality_pg:
+  chaos_pg:

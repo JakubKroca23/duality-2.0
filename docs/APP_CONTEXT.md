@@ -1,7 +1,8 @@
-# Duality 2.0 — dlouhodobý kontext (agent memory)
+# Chaos 2.0 — dlouhodobý kontext (agent memory)
 
-> Aktualizováno: 2026-09-22  
-> Repo: `/home/jakub/github/duality-2.0`  
+> Aktualizováno: 2026-10-08  
+> Repo: `/home/jakub/github/duality-2.0` (npm: `chaos-2.0`)  
+> Produkce: https://chaos.propoj.app  
 > Jazyk UI: čeština; kód/komentáře: angličtina.  
 > Údržba: po změnách mechanik/shaderů/API aktualizovat tento soubor (+ mirror do agent store). Rule: `.cursor/rules/update-app-context.mdc`.
 
@@ -9,7 +10,7 @@
 
 ## Co to je
 
-**Yin-yang territory pong** (Day=0 / Night=1). Míčky přebarvují cizí území a odrážejí se. Simulace v prohlížeči; volitelně headless API (Postgres).
+**Yin-yang territory pong** (Day=0 / Night=1), branding **Chaos 2.0**. Míčky přebarvují cizí území a odrážejí se. Simulace v prohlížeči; volitelně headless API (Postgres).
 
 **Renderer: PixiJS v8 WebGL** (`src/sim/pixi/`) — jediný vizuální backend. Canvas 2D `draw()` odstraněn. `#simCanvas` je jen layout probe; viditelný view je `.pixi-view`.
 
@@ -24,15 +25,18 @@
 | Web (Vite) | `src/`, `index.html` | TS, PixiJS v8, Tone.js |
 | API | `apps/api` | Hono, `ws`, pg |
 | Headless sim | `packages/sim` | čistá fyzika bez renderu |
-| DB / prod stack | Docker Compose | Postgres `:5433`; web nginx `:8080`; api vnitřně `:8787` |
+| DB / prod stack | Docker Compose + Traefik | Postgres; web nginx; api `:8787`; HTTPS `chaos.propoj.app` |
 
 ```bash
-npm run docker:up    # build + up (web+api+db) → http://127.0.0.1:8080
+npm run docker:up       # lokálně → http://127.0.0.1:8080
+npm run docker:up:prod  # Traefik → https://chaos.propoj.app
 npm run docker:down
 npm run docker:logs
 # nebo jen DB pro lokální npm run dev:
 npm run dev:db
 ```
+
+Produkce: `docker-compose.prod.yml` — Traefik labels na `web` → `Host(chaos.propoj.app)`, síť `personal`, certresolver `letsencrypt`. Viz `.env.example`.
 
 Lokalní `vite preview` (`npm run preview`) slouží jen k rychlému náhledu `dist/` — produkční cesta je Docker web image.
 ---
@@ -134,8 +138,10 @@ Game loop: physics → particles → flashes → shader trails → stats → **P
 
 ## Backend
 
-- Postgres: themes, presets, simulation_runs, territory_samples
+- Postgres: themes, presets, simulation_runs, territory_samples (Docker user/db default `chaos`)
 - API `:8787` + WS `/ws`; headless 30 Hz, `speedScale`
+- CORS přes `CORS_ORIGINS` (default inkl. `https://chaos.propoj.app` + localhost Vite)
+- Prod: nginx ve web image proxy `/api` + `/ws` (stejný origin)
 
 ---
 

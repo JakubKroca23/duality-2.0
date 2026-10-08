@@ -1,6 +1,8 @@
-# Duality 2.0
+# Chaos 2.0
 
-Canvas 2D yin-yang territory pong + lokální backend pro dlouhodobé sim-běhy.
+Yin-yang territory pong + backend pro dlouhodobé sim-běhy.
+
+**Produkce:** https://chaos.propoj.app
 
 ## Rychlý start (lokálně)
 
@@ -26,17 +28,43 @@ V UI: **Nastavení → Běhy** — spusť kontejner z aktuální fyziky, sleduj 
 
 ## Stack
 
-- **Web** — Vite + Canvas (stávající UI)
+- **Web** — Vite + PixiJS v8
 - **API** — Hono + WebSocket (`apps/api`)
 - **Sim engine** — headless `@duality/sim` (`packages/sim`)
 - **DB** — Postgres 16 přes Docker Compose na `localhost:5433`
 
-## API (localhost:8787)
+## Deploy (chaos.propoj.app)
+
+Docker Compose + Traefik na síti `personal` (Let's Encrypt).
+
+```bash
+cp .env.example .env   # nastav silné POSTGRES_PASSWORD
+npm run docker:up:prod
+# ekvivalent:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Předpoklady na serveru:
+1. Docker síť `personal` existuje (Traefik stack)
+2. DNS A/AAAA `chaos.propoj.app` → IP serveru
+3. Traefik má entrypoint `websecure` a certresolver `letsencrypt`
+
+Lokální náhled celého stacku (bez Traefik): `http://127.0.0.1:8080` (`CHAOS_PORT`).
+
+```bash
+npm run docker:up
+npm run docker:down
+npm run docker:logs
+```
+
+## API
 
 - `GET /api/health`
 - `GET/POST /api/presets`, `GET/POST /api/themes`
 - `GET/POST /api/runs`, `POST /api/runs/:id/stop|start`, `GET /api/runs/:id/samples`
 - `WS /ws` — `{ type: "subscribe", runId }` → sample/status eventy
+
+Na produkci jsou `/api` a `/ws` proxované přes nginx ve web kontejneru (stejný origin).
 
 ## Poznámka
 
