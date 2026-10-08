@@ -105,7 +105,7 @@ Page bleed (`ambient.ts`): Canvas 2D fullscreen mimo arénu.
 
 | Param | Význam |
 |-------|--------|
-| `glowIntensity` | Aura míčku |
+| `glowIntensity` | Aura míčku (jen z témat / persist — není v UI) |
 | `maxTrail` / `trailSolid` | Stopa |
 | `particleCount` | Jiskry |
 | `areaSaturation` | Sytost territory fill |

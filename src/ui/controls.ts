@@ -565,14 +565,6 @@ export function bindControls(_initial?: SimState): void {
     saveSettings(state);
   });
 
-  const sliderGlow = el<HTMLInputElement>('sliderGlow');
-  const lblGlowVal = el('lblGlowVal');
-  sliderGlow.addEventListener('input', (e) => {
-    state.gfxOptions.glowIntensity = parseInt((e.target as HTMLInputElement).value, 10);
-    lblGlowVal.textContent = String(state.gfxOptions.glowIntensity);
-    saveSettings(state);
-  });
-
   const sliderTrail = el<HTMLInputElement>('sliderTrail');
   const lblTrailVal = el('lblTrailVal');
   sliderTrail.addEventListener('input', (e) => {
@@ -865,9 +857,6 @@ export function bindControls(_initial?: SimState): void {
     lblGridSizeVal.textContent = `${state.physicsOptions.gridSize}×${state.physicsOptions.gridSize}`;
     sliderGridSize.min = String(GRID_SIZE_MIN);
     sliderGridSize.max = String(GRID_SIZE_MAX);
-
-    sliderGlow.value = String(state.gfxOptions.glowIntensity);
-    lblGlowVal.textContent = String(state.gfxOptions.glowIntensity);
 
     sliderTrail.value = String(state.gfxOptions.maxTrail);
     lblTrailVal.textContent = String(state.gfxOptions.maxTrail);
